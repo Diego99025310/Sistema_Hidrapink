@@ -1294,6 +1294,18 @@
       return;
     }
 
+    const hasContent = (value) => {
+      if (value == null) return false;
+      if (typeof value === 'object') {
+        if (value.type === 'copy-link') {
+          return Boolean(value.url);
+        }
+        return true;
+      }
+      const normalized = String(value).trim();
+      return normalized !== '' && normalized !== '-';
+    };
+
     const createCopyLinkElement = (value) => {
       const wrapper = document.createElement('span');
       wrapper.className = 'detail-value detail-value-with-action';
@@ -1349,30 +1361,58 @@
       return el;
     };
 
+    const highlightFields = [
+      ['Nome', data.nome],
+      ['Cupom', data.cupom],
+      [
+        'Link',
+        data.discountLink
+          ? { type: 'copy-link', url: data.discountLink, label: data.discountLink, copyLabel: 'Copiar link' }
+          : '-'
+      ]
+    ];
+
+    const highlightWrapper = document.createElement('div');
+    highlightWrapper.className = 'details-highlight';
+
+    highlightFields.forEach(([label, value]) => {
+      const row = document.createElement('p');
+      row.className = 'detail-row highlight-row';
+
+      const labelEl = document.createElement('strong');
+      labelEl.className = 'detail-label';
+      labelEl.textContent = label;
+      row.appendChild(labelEl);
+
+      const valueEl = createValueElement(value);
+      row.appendChild(valueEl);
+
+      highlightWrapper.appendChild(row);
+    });
+
+    container.appendChild(highlightWrapper);
+
     const groups = [
       {
-        title: 'Identidade',
+        title: 'Contato',
         items: [
-          ['Nome', data.nome],
           ['Instagram', data.instagram],
           ['Email', data.email],
-          ['Contato', data.contato]
+          ['Telefone', data.contato]
         ]
       },
       {
-        title: 'Performance',
+        title: 'Desempenho',
         items: [
-          ['Cupom', data.cupom],
-          ['Comissao (%)', data.commissionPercent],
-          ['Link compartilhavel', data.discountLink ? { type: 'copy-link', url: data.discountLink, label: data.discountLink, copyLabel: 'Copiar link' } : '-']
+          ['Comissão (%)', data.commissionPercent]
         ]
       },
       {
-        title: 'Endereco',
+        title: 'Endereço',
         items: [
           ['CEP', data.cep],
           ['Logradouro', data.logradouro],
-          ['Numero', data.numero],
+          ['Número', data.numero],
           ['Complemento', data.complemento],
           ['Bairro', data.bairro],
           ['Cidade', data.cidade],
@@ -1385,7 +1425,21 @@
           ['Login', data.loginEmail]
         ]
       }
-    ];
+    ]
+      .map((group) => ({
+        title: group.title,
+        items: group.items.filter(([, value]) => hasContent(value))
+      }))
+      .filter((group) => group.items.length > 0);
+
+    if (!groups.length) return;
+
+    const detailsElement = document.createElement('details');
+    detailsElement.className = 'additional-details';
+
+    const summary = document.createElement('summary');
+    summary.textContent = 'Ver dados completos';
+    detailsElement.appendChild(summary);
 
     const grid = document.createElement('div');
     grid.className = 'details-grid';
@@ -1404,6 +1458,7 @@
       group.items.forEach(([label, value]) => {
         const row = document.createElement('p');
         row.className = 'detail-row';
+
         const labelEl = document.createElement('strong');
         labelEl.className = 'detail-label';
         labelEl.textContent = label;
@@ -1418,7 +1473,8 @@
       grid.appendChild(card);
     });
 
-    container.appendChild(grid);
+    detailsElement.appendChild(grid);
+    container.appendChild(detailsElement);
   };
 
   const initInfluencerPage = () => {
