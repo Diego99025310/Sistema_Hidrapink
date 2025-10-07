@@ -1015,14 +1015,25 @@
 
     const updateSaleComputedFields = () => {
       if (!saleGrossInput || !saleDiscountInput || !saleNetInput || !saleCommissionInput) return;
+      const hasGrossValue = saleGrossInput.value !== '';
+      const hasDiscountValue = saleDiscountInput.value !== '';
+      if (!hasGrossValue && !hasDiscountValue) {
+        saleNetInput.value = '';
+        saleCommissionInput.value = '';
+        return;
+      }
+
       const gross = Number(saleGrossInput.value || 0);
       const discount = Number(saleDiscountInput.value || 0);
       const influencer = getInfluencerByCoupon(saleCouponSelect?.value || '');
       const commissionRate = influencer?.commission_rate != null ? Number(influencer.commission_rate) : 0;
-      const net = Math.max(0, gross - Math.max(0, discount));
-      const commission = net * (commissionRate / 100);
-      saleNetInput.value = net ? net.toFixed(2) : '';
-      saleCommissionInput.value = commission ? commission.toFixed(2) : '';
+      const safeGross = Number.isFinite(gross) ? gross : 0;
+      const safeDiscount = Number.isFinite(discount) ? discount : 0;
+      const net = Math.max(0, safeGross - Math.max(0, safeDiscount));
+      const rate = Number.isFinite(commissionRate) ? commissionRate : 0;
+      const commission = Math.max(0, net * rate / 100);
+      saleNetInput.value = net.toFixed(2);
+      saleCommissionInput.value = commission.toFixed(2);
     };
 
     const renderSalesTable = () => {
@@ -1074,11 +1085,17 @@
         return;
       }
       salesSummaryEl.innerHTML = '';
-      const totalNet = document.createElement('span');
-      totalNet.textContent = `Total liquido: ${formatCurrency(summary.total_net)}`;
-      const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Comissao total: ${formatCurrency(summary.total_commission)}`;
-      salesSummaryEl.append(totalNet, totalCommission);
+      const summaryItems = [
+        `Total líquido: ${formatCurrency(summary.total_net)}`,
+        `Comissão total: ${formatCurrency(summary.total_commission)}`,
+        `Comissão do cupom: ${formatPercentage(summary.commission_rate)}`,
+        `Registros: ${sales.length}`
+      ];
+      summaryItems.forEach((text) => {
+        const badge = document.createElement('span');
+        badge.textContent = text;
+        salesSummaryEl.appendChild(badge);
+      });
     };
 
     const resetSaleForm = ({ clearMessage = false, keepCoupon = true } = {}) => {
@@ -1294,6 +1311,18 @@
       return;
     }
 
+    const hasContent = (value) => {
+      if (value == null) return false;
+      if (typeof value === 'object') {
+        if (value.type === 'copy-link') {
+          return Boolean(value.url);
+        }
+        return true;
+      }
+      const normalized = String(value).trim();
+      return normalized !== '' && normalized !== '-';
+    };
+
     const createCopyLinkElement = (value) => {
       const wrapper = document.createElement('span');
       wrapper.className = 'detail-value detail-value-with-action';
@@ -1349,30 +1378,58 @@
       return el;
     };
 
+    const highlightFields = [
+      ['Nome', data.nome],
+      ['Cupom', data.cupom],
+      [
+        'Link',
+        data.discountLink
+          ? { type: 'copy-link', url: data.discountLink, label: data.discountLink, copyLabel: 'Copiar link' }
+          : '-'
+      ]
+    ];
+
+    const highlightWrapper = document.createElement('div');
+    highlightWrapper.className = 'details-highlight';
+
+    highlightFields.forEach(([label, value]) => {
+      const row = document.createElement('p');
+      row.className = 'detail-row highlight-row';
+
+      const labelEl = document.createElement('strong');
+      labelEl.className = 'detail-label';
+      labelEl.textContent = label;
+      row.appendChild(labelEl);
+
+      const valueEl = createValueElement(value);
+      row.appendChild(valueEl);
+
+      highlightWrapper.appendChild(row);
+    });
+
+    container.appendChild(highlightWrapper);
+
     const groups = [
       {
-        title: 'Identidade',
+        title: 'Contato',
         items: [
-          ['Nome', data.nome],
           ['Instagram', data.instagram],
           ['Email', data.email],
-          ['Contato', data.contato]
+          ['Telefone', data.contato]
         ]
       },
       {
-        title: 'Performance',
+        title: 'Desempenho',
         items: [
-          ['Cupom', data.cupom],
-          ['Comissao (%)', data.commissionPercent],
-          ['Link compartilhavel', data.discountLink ? { type: 'copy-link', url: data.discountLink, label: data.discountLink, copyLabel: 'Copiar link' } : '-']
+          ['Comissão (%)', data.commissionPercent]
         ]
       },
       {
-        title: 'Endereco',
+        title: 'Endereço',
         items: [
           ['CEP', data.cep],
           ['Logradouro', data.logradouro],
-          ['Numero', data.numero],
+          ['Número', data.numero],
           ['Complemento', data.complemento],
           ['Bairro', data.bairro],
           ['Cidade', data.cidade],
@@ -1385,7 +1442,21 @@
           ['Login', data.loginEmail]
         ]
       }
-    ];
+    ]
+      .map((group) => ({
+        title: group.title,
+        items: group.items.filter(([, value]) => hasContent(value))
+      }))
+      .filter((group) => group.items.length > 0);
+
+    if (!groups.length) return;
+
+    const detailsElement = document.createElement('details');
+    detailsElement.className = 'additional-details';
+
+    const summary = document.createElement('summary');
+    summary.textContent = 'Ver dados completos';
+    detailsElement.appendChild(summary);
 
     const grid = document.createElement('div');
     grid.className = 'details-grid';
@@ -1404,6 +1475,7 @@
       group.items.forEach(([label, value]) => {
         const row = document.createElement('p');
         row.className = 'detail-row';
+
         const labelEl = document.createElement('strong');
         labelEl.className = 'detail-label';
         labelEl.textContent = label;
@@ -1418,7 +1490,8 @@
       grid.appendChild(card);
     });
 
-    container.appendChild(grid);
+    detailsElement.appendChild(grid);
+    container.appendChild(detailsElement);
   };
 
   const initInfluencerPage = () => {
