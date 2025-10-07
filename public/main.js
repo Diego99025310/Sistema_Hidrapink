@@ -1075,9 +1075,9 @@
       }
       salesSummaryEl.innerHTML = '';
       const totalNet = document.createElement('span');
-      totalNet.textContent = `Total liquido: ${formatCurrency(summary.total_net)}`;
+      totalNet.textContent = `Total em vendas: ${formatCurrency(summary.total_net)}`;
       const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Comissao total: ${formatCurrency(summary.total_commission)}`;
+      totalCommission.textContent = `Sua comissão: ${formatCurrency(summary.total_commission)}`;
       salesSummaryEl.append(totalNet, totalCommission);
     };
 
@@ -1295,8 +1295,8 @@
     }
 
     const createCopyLinkElement = (value) => {
-      const wrapper = document.createElement('span');
-      wrapper.className = 'detail-value detail-value-with-action';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'info-value detail-actions';
       if (!value?.url) {
         wrapper.textContent = '-';
         return wrapper;
@@ -1344,81 +1344,47 @@
         return createCopyLinkElement(value);
       }
       const el = document.createElement('span');
-      el.className = 'detail-value';
+      el.className = 'info-value';
       el.textContent = value == null || value === '' ? '-' : String(value);
       return el;
     };
 
-    const groups = [
-      {
-        title: 'Identidade',
-        items: [
-          ['Nome', data.nome],
-          ['Instagram', data.instagram],
-          ['Email', data.email],
-          ['Contato', data.contato]
-        ]
-      },
-      {
-        title: 'Performance',
-        items: [
-          ['Cupom', data.cupom],
-          ['Comissao (%)', data.commissionPercent],
-          ['Link compartilhavel', data.discountLink ? { type: 'copy-link', url: data.discountLink, label: data.discountLink, copyLabel: 'Copiar link' } : '-']
-        ]
-      },
-      {
-        title: 'Endereco',
-        items: [
-          ['CEP', data.cep],
-          ['Logradouro', data.logradouro],
-          ['Numero', data.numero],
-          ['Complemento', data.complemento],
-          ['Bairro', data.bairro],
-          ['Cidade', data.cidade],
-          ['Estado', data.estado]
-        ]
-      },
-      {
-        title: 'Acesso',
-        items: [
-          ['Login', data.loginEmail]
-        ]
-      }
+    const items = [
+      ['Nome', data.nome],
+      ['Cupom', data.cupom],
+      [
+        'Link',
+        data.discountLink
+          ? {
+              type: 'copy-link',
+              url: data.discountLink,
+              label: data.discountLink,
+              copyLabel: 'Copiar link'
+            }
+          : '-'
+      ]
     ];
 
-    const grid = document.createElement('div');
-    grid.className = 'details-grid';
+    const fragment = document.createDocumentFragment();
 
-    groups.forEach((group) => {
-      const card = document.createElement('div');
-      card.className = 'detail-card';
+    items.forEach(([label, value]) => {
+      const item = document.createElement('div');
+      item.className = 'info-item';
 
-      if (group.title) {
-        const heading = document.createElement('p');
-        heading.className = 'detail-card-title';
-        heading.textContent = group.title;
-        card.appendChild(heading);
+      const labelEl = document.createElement('span');
+      labelEl.className = 'info-label';
+      labelEl.textContent = `${label}:`;
+      item.appendChild(labelEl);
+
+      const valueEl = createValueElement(value);
+      if (valueEl) {
+        item.appendChild(valueEl);
       }
 
-      group.items.forEach(([label, value]) => {
-        const row = document.createElement('p');
-        row.className = 'detail-row';
-        const labelEl = document.createElement('strong');
-        labelEl.className = 'detail-label';
-        labelEl.textContent = label;
-        row.appendChild(labelEl);
-
-        const valueEl = createValueElement(value);
-        row.appendChild(valueEl);
-
-        card.appendChild(row);
-      });
-
-      grid.appendChild(card);
+      fragment.appendChild(item);
     });
 
-    container.appendChild(grid);
+    container.appendChild(fragment);
   };
 
   const initInfluencerPage = () => {
@@ -1438,7 +1404,7 @@
       if (!Array.isArray(rows) || rows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 5;
+        emptyCell.colSpan = 4;
         emptyCell.className = 'empty';
         emptyCell.textContent = 'Nenhuma venda registrada.';
         emptyRow.appendChild(emptyCell);
@@ -1448,13 +1414,14 @@
       const fragment = document.createDocumentFragment();
       rows.forEach((sale) => {
         const tr = document.createElement('tr');
-        const cells = [
-          sale.date || '-',
-          formatCurrency(sale.gross_value),
-          formatCurrency(sale.discount),
-          formatCurrency(sale.net_value),
-          formatCurrency(sale.commission)
-        ];
+        const customerName =
+          sale.customer_name || sale.cliente || sale.customer || sale.client_name || sale.client || '-';
+        const valueToDisplay =
+          sale.net_value != null && sale.net_value !== ''
+            ? formatCurrency(sale.net_value)
+            : formatCurrency(sale.gross_value);
+        const statusLabel = sale.status || sale.status_label || sale.statusLabel || 'Concluída';
+        const cells = [sale.date || '-', customerName, valueToDisplay, statusLabel];
         cells.forEach((value) => {
           const td = document.createElement('td');
           td.textContent = value;
@@ -1473,9 +1440,9 @@
       }
       salesSummaryEl.innerHTML = '';
       const totalNet = document.createElement('span');
-      totalNet.textContent = `Total liquido: ${formatCurrency(summary.total_net)}`;
+      totalNet.textContent = `Total em vendas: ${formatCurrency(summary.total_net)}`;
       const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Comissao total: ${formatCurrency(summary.total_commission)}`;
+      totalCommission.textContent = `Sua comissão: ${formatCurrency(summary.total_commission)}`;
       salesSummaryEl.append(totalNet, totalCommission);
     };
 
@@ -1500,7 +1467,7 @@
           renderSalesSummary(null);
         }
         if (!salesData?.length) {
-          setMessage(salesMessageEl, 'Nenhuma venda registrada ate o momento.', 'info');
+          setMessage(salesMessageEl, '', '');
         } else {
           setMessage(salesMessageEl, 'Vendas atualizadas com sucesso.', 'success');
         }
@@ -1528,7 +1495,7 @@
           return;
         }
         renderInfluencerDetails(detailsEl, formatInfluencerDetails(influencer));
-        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover! ??', 'success');
+        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover! 💗', 'success');
         loadInfluencerSales(influencer.id);
       } catch (error) {
         if (error.status === 401) {
