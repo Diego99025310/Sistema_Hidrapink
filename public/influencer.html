@@ -4,52 +4,313 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Painel Influenciadora | HidraPink</title>
-    <link rel="stylesheet" href="style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <script defer src="main.js"></script>
+    <style>
+      :root {
+        --pink-strong: #f27da3;
+        --pink-light: #ff7fae;
+        --pink-soft: #ffe1ec;
+        --text-color: #3c1f2d;
+        --shadow: 0 18px 35px rgba(242, 125, 163, 0.25);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'Montserrat', sans-serif;
+        background: #fff;
+        color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 32px 16px 48px;
+      }
+
+      .pinklover-container {
+        width: 100%;
+        max-width: 600px;
+      }
+
+      .pinklover-content {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .pinklover-banner {
+        background: var(--pink-strong);
+        color: #2d0d1b;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.5rem;
+        padding: 18px 24px;
+        border-radius: 22px;
+        box-shadow: var(--shadow);
+      }
+
+      .card {
+        background: linear-gradient(135deg, var(--pink-strong), var(--pink-light));
+        border-radius: 26px;
+        padding: 24px 24px 28px;
+        box-shadow: var(--shadow);
+        color: #2d0d1b;
+      }
+
+      .card h2 {
+        margin: 0 0 18px;
+        font-size: 1.25rem;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .logout-button {
+        margin: 20px auto 0;
+        background: #ffffff;
+        color: var(--pink-strong);
+        border: none;
+        border-radius: 999px;
+        padding: 12px 28px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 12px 24px rgba(255, 255, 255, 0.25);
+      }
+
+      .logout-button:hover,
+      .logout-button:focus {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 30px rgba(255, 255, 255, 0.35);
+        outline: none;
+      }
+
+      .influencer-info {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .info-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .info-label {
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .info-value {
+        font-weight: 500;
+        font-size: 1rem;
+        word-break: break-word;
+      }
+
+      .detail-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .copy-button {
+        background: rgba(255, 255, 255, 0.22);
+        color: #2d0d1b;
+        border: none;
+        border-radius: 999px;
+        padding: 8px 16px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .copy-button:hover,
+      .copy-button:focus {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(45, 13, 27, 0.15);
+        outline: none;
+      }
+
+      .copy-button.copied {
+        background: rgba(255, 255, 255, 0.4);
+      }
+
+      .copy-button.error {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .influencer-message {
+        margin-top: 16px;
+        font-size: 0.95rem;
+        text-align: center;
+      }
+
+      .sales-header {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .sales-header p {
+        margin: 0;
+        text-align: center;
+        font-weight: 600;
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+        min-width: 460px;
+      }
+
+      th,
+      td {
+        padding: 14px 16px;
+        text-align: left;
+      }
+
+      th {
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        color: #2d0d1b;
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      tbody tr:nth-child(odd) {
+        background: rgba(255, 255, 255, 0.35);
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      tbody tr:hover {
+        background: rgba(255, 255, 255, 0.45);
+      }
+
+      td {
+        font-weight: 500;
+      }
+
+      td.empty {
+        text-align: center;
+        font-weight: 600;
+        padding: 24px 16px;
+      }
+
+      .sales-message {
+        margin: 16px 0;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      .influencer-message[data-type='success'],
+      .sales-message[data-type='success'] {
+        color: #1d5c48;
+      }
+
+      .influencer-message[data-type='error'],
+      .sales-message[data-type='error'] {
+        color: #8b1f3d;
+      }
+
+      .influencer-message[data-type='info'],
+      .sales-message[data-type='info'] {
+        color: #3c1f2d;
+        opacity: 0.85;
+      }
+
+      .summary {
+        margin-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-align: center;
+        font-weight: 600;
+      }
+
+      .summary span {
+        display: block;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.45);
+      }
+
+      a.detail-link {
+        color: inherit;
+        font-weight: 600;
+        text-decoration: underline;
+      }
+
+      @media (max-width: 480px) {
+        body {
+          padding: 24px 12px 32px;
+        }
+
+        .card {
+          padding: 20px 18px 24px;
+        }
+
+        table {
+          min-width: 360px;
+        }
+      }
+    </style>
   </head>
-  <body data-page="influencer" class="pinklover-body">
+  <body data-page="influencer">
     <div class="pinklover-container" id="influencerPage">
-      <header class="pinklover-hero">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-          <h1 class="hero-title">Bem-vinda, Pinklover!</h1>
-          <p class="hero-subtitle">Acompanhe seus resultados.</p>
-          <button type="button" data-action="logout" class="hero-logout">Sair do painel</button>
-        </div>
-      </header>
-      <main class="pinklover-main">
-        <section class="card pinklover-card">
-          <div class="card-header">
-            <h2>Meus dados</h2>
-            <span class="badge">Perfil atualizado</span>
-          </div>
-          <div id="influencerDetails" class="details"></div>
-          <div id="influencerMessage" class="message" aria-live="polite"></div>
+      <header class="pinklover-banner">Bem vinda, Pinklover.</header>
+
+      <main class="pinklover-content">
+        <section class="card" aria-labelledby="influencer-info-title">
+          <h2 id="influencer-info-title">Suas informações</h2>
+          <div id="influencerDetails" class="influencer-info"></div>
+          <div id="influencerMessage" class="influencer-message" aria-live="polite"></div>
+          <button type="button" data-action="logout" class="logout-button">Sair do painel</button>
         </section>
-        <section class="card pinklover-card">
-          <div class="card-header">
-            <h2>Minhas vendas</h2>
-            <span class="badge badge-soft">Performance</span>
+
+        <section class="card" aria-labelledby="influencer-sales-title">
+          <div class="sales-header">
+            <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
+            <p>Veja suas vendas e status atualizados em tempo real.</p>
           </div>
-          <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
+          <div id="influencerSalesMessage" class="sales-message" aria-live="polite"></div>
           <div class="table-wrapper">
-            <table id="influencerSalesTable" class="pinklover-table">
+            <table id="influencerSalesTable">
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Bruto</th>
-                  <th>Desconto</th>
-                  <th>Liquido</th>
-                  <th>Comissão</th>
+                  <th>Cliente</th>
+                  <th>Valor</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-          <div id="influencerSalesSummary" class="summary summary-highlight"></div>
+          <div id="influencerSalesSummary" class="summary"></div>
         </section>
       </main>
     </div>
