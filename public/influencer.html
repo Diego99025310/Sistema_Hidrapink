@@ -3,78 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Painel Influenciadora | HidraPink</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>Painel da Influenciadora | HidraPink</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
     <script defer src="main.js"></script>
   </head>
   <body data-page="influencer" class="pinklover-body">
-    <div class="pinklover-container" id="influencerPage">
-      <header class="pinklover-hero">
-        <div class="hero-overlay"></div>
-        <div class="hero-content">
-          <div class="hero-intro">
-            <span class="hero-badge">Painel da Pinklover</span>
-            <h1 class="hero-title">Bem-vinda ao universo HidraPink</h1>
-            <p class="hero-subtitle">
-              Acompanhe seu desempenho, comiss�es e hist�rico de vendas com uma vis�o clara e acolhedora.
-            </p>
-          </div>
-          <div class="hero-actions">
-            <button type="button" data-action="logout" class="hero-logout">Sair do painel</button>
-          </div>
-        </div>
-      </header>
+    <main id="influencerPage" class="pinklover-dashboard" aria-live="polite">
+      <section class="panel panel-welcome">
+        <h1>Bem vinda, Pinklover.</h1>
+      </section>
 
-      <main class="pinklover-main" aria-live="polite">
-        <section class="pinklover-card profile-card">
-          <h1 class="hero-title">Bem-vinda, Pinklover!</h1>
-          <p class="hero-subtitle">Acompanhe seus resultados.</p>
-          <button type="button" data-action="logout" class="hero-logout">Sair do painel</button>
-        </div>
-      </header>
-      <main class="pinklover-main">
-        <section class="card pinklover-card">
-          <div class="card-header">
-            <div class="card-heading">
-              <h2>Dados da influenciadora</h2>
-              <p class="card-description">Informacoes pessoais, contatos e dados para acompanhar o seu trabalho.</p>
-            </div>
-            <span class="badge">Perfil atualizado</span>
-          </div>
-          <div id="influencerMessage" class="message" aria-live="polite"></div>
-          <div id="influencerDetails" class="details"></div>
-        </section>
+      <section class="panel panel-details" aria-labelledby="detailsTitle">
+        <h2 id="detailsTitle">Dados principais</h2>
+        <div id="influencerMessage" class="message" aria-live="polite"></div>
+        <div id="influencerDetails" class="details-list"></div>
+      </section>
 
-        <section class="pinklover-card sales-card">
-        <section class="card pinklover-card">
-          <div class="card-header">
-            <div class="card-heading">
-              <h2>Hist�rico de vendas</h2>
-              <p class="card-description">Visualize cada venda, descontos aplicados e o que voc� recebeu de comiss�o.</p>
-            </div>
-            <span class="badge badge-soft">Performance</span>
-          </div>
-          <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
-          <div id="influencerSalesSummary" class="summary summary-highlight"></div>
-          <div class="table-wrapper">
-            <table id="influencerSalesTable" class="pinklover-table">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Bruto</th>
-                  <th>Desconto</th>
-                  <th>Liquido</th>
-                  <th>Comissão</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
-      </main>
-    </div>
+      <section class="panel panel-sales" aria-labelledby="salesTitle">
+        <h2 id="salesTitle">Acompanhe seu desempenho.</h2>
+        <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
+        <div id="influencerSalesSummary" class="summary"></div>
+        <div class="table-wrapper">
+          <table id="influencerSalesTable" class="sales-table">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Bruto</th>
+                <th scope="col">Desconto</th>
+                <th scope="col">Líquido</th>
+                <th scope="col">Comissão</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </body>
 </html>
