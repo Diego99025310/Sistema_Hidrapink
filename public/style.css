@@ -27,6 +27,13 @@ body[data-page="influencer"] {
   --bg-gradient-end: #f5d0fe;
 }
 
+body[data-page="master-sales"] {
+  --primary: var(--accent-pink);
+  --primary-hover: var(--accent-pink-hover);
+  --bg-gradient-start: #fdf2f8;
+  --bg-gradient-end: #f5d0fe;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -660,15 +667,516 @@ body[data-page="master"] .button-row {
   background: #e6ecfc;
   border-color: #9aaee5;
 }
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: rgba(76, 11, 47, 0.65);
+}
+
+.intro {
+  margin: 12px 0 0;
+  font-size: clamp(1rem, 2.8vw, 1.15rem);
+  color: rgba(76, 11, 47, 0.8);
+  max-width: 38ch;
+}
 .pinklover-body {
   font-family: 'Poppins', sans-serif;
-  background: radial-gradient(circle at 20% 20%, #fbd3db 0%, rgba(251, 211, 219, 0) 45%),
-              radial-gradient(circle at 80% 0%, rgba(240, 121, 153, 0.3), rgba(240, 121, 153, 0) 55%),
-              radial-gradient(circle at 50% 100%, rgba(228, 68, 122, 0.4), rgba(15, 15, 40, 0) 60%),
-              #0b0d1b;
+  background: linear-gradient(180deg, #ffe6f2 0%, #ffd4e6 45%, #ffc7df 100%);
   min-height: 100vh;
-  color: #1b1b2f;
+  color: #3a1030;
   margin: 0;
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.influencer-layout {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(20px, 5vw, 32px);
+  padding: 0 clamp(16px, 6vw, 48px);
+}
+
+.quadrant {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.55))
+      padding-box,
+    linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 182, 209, 0.8)) border-box;
+  border-radius: 26px;
+  border: 1px solid transparent;
+  box-shadow: 0 24px 50px rgba(236, 72, 153, 0.25);
+  backdrop-filter: blur(6px);
+  padding: clamp(28px, 6vw, 40px);
+  display: grid;
+  gap: clamp(16px, 3vw, 24px);
+}
+
+.quadrant-welcome {
+  text-align: center;
+  background: radial-gradient(circle at 20% -10%, rgba(255, 255, 255, 0.9), rgba(255, 213, 228, 0.65))
+      padding-box,
+    linear-gradient(135deg, rgba(245, 112, 157, 0.65), rgba(236, 72, 153, 0.9)) border-box;
+  color: #4c0b2f;
+}
+
+.quadrant-welcome h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  font-weight: 700;
+}
+
+.quadrant-details,
+.quadrant-sales {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 201, 221, 0.88)) padding-box,
+    linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(236, 72, 153, 0.65)) border-box;
+}
+
+.quadrant-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quadrant h2 {
+  margin: 0;
+  font-size: clamp(1.3rem, 3vw, 1.6rem);
+  font-weight: 600;
+  color: #4c0b2f;
+}
+
+.quadrant .subtitle {
+  margin: 6px 0 0;
+  color: rgba(76, 11, 47, 0.72);
+  font-weight: 500;
+  font-size: 0.98rem;
+}
+
+.logout-button {
+  border: none;
+  background: rgba(236, 72, 153, 0.85);
+  color: #fff;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 18px 28px rgba(236, 72, 153, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.logout-button:hover,
+.logout-button:focus {
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow: 0 20px 32px rgba(236, 72, 153, 0.45);
+}
+
+.quadrant .message {
+  min-height: 48px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  padding: 12px 18px;
+  font-weight: 500;
+  color: #4c0b2f;
+  border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.quadrant .message[data-type='success'] {
+  background: rgba(72, 187, 120, 0.18);
+  border-color: rgba(56, 161, 105, 0.4);
+  color: #1d4f3b;
+}
+
+.quadrant .message[data-type='error'] {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(225, 29, 72, 0.4);
+  color: #7f142f;
+}
+
+.quadrant .message[data-type='info'] {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #1e3a8a;
+}
+
+.quadrant-form {
+  gap: clamp(18px, 4vw, 28px);
+}
+
+.quadrant-form .actions-grid {
+  margin: 8px 0 4px;
+}
+
+.quadrant-form .link-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(236, 72, 153, 0.25);
+  color: #4c0b2f;
+  box-shadow: 0 18px 34px rgba(236, 72, 153, 0.2);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.quadrant-form .link-card:hover,
+.quadrant-form .link-card:focus {
+  transform: translateY(-1px);
+  border-color: rgba(236, 72, 153, 0.45);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 24px 44px rgba(236, 72, 153, 0.25);
+}
+
+.sales-form {
+  display: grid;
+  gap: clamp(18px, 4vw, 26px);
+}
+
+.sales-fields {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(14px, 4vw, 20px);
+}
+
+.sales-fields label {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(236, 72, 153, 0.2);
+  padding: 18px;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.sales-fields select,
+.sales-fields input {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: clamp(14px, 4vw, 20px);
+}
+
+.total-field {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 20px;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.92), rgba(255, 190, 215, 0.65));
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  box-shadow: 0 20px 38px rgba(236, 72, 153, 0.2);
+}
+
+.total-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(76, 11, 47, 0.7);
+}
+
+.total-field input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: clamp(1.2rem, 4vw, 1.6rem);
+  font-weight: 600;
+  color: #4c0b2f;
+  text-align: right;
+}
+
+.total-field input[readonly] {
+  cursor: default;
+}
+
+.sales-form .button-row {
+  justify-content: flex-start;
+}
+
+.ghost-button {
+  background: transparent;
+  color: #4c0b2f;
+  border: 1px solid rgba(76, 11, 47, 0.3);
+  box-shadow: none;
+  padding: 10px 20px;
+}
+
+.ghost-button:hover,
+.ghost-button:focus {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.4);
+}
+
+.master-sales-history .summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.master-sales-history .summary span {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #4c0b2f;
+  border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+.quadrant-details .details {
+  display: grid;
+  gap: 14px;
+}
+
+.quadrant-details .details-highlight {
+  display: grid;
+  gap: 12px;
+}
+
+.quadrant-details .highlight-row {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.12);
+}
+
+.quadrant-details .detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 1rem;
+  color: #4c0b2f;
+}
+
+.quadrant-details .detail-label {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.quadrant-details .detail-label::after {
+  content: ':';
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.quadrant-details .detail-value {
+  font-weight: 600;
+  color: #4c0b2f;
+}
+
+.quadrant-details .detail-value-with-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.quadrant-details .detail-link {
+  color: #a81863;
+  text-decoration: none;
+}
+
+.quadrant-details .detail-link:hover,
+.quadrant-details .detail-link:focus {
+  text-decoration: underline;
+}
+
+.quadrant-details .copy-button {
+  border: none;
+  background: rgba(236, 72, 153, 0.16);
+  color: #a81863;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 16px rgba(236, 72, 153, 0.2);
+}
+
+.quadrant-details .copy-button:hover,
+.quadrant-details .copy-button:focus {
+  outline: none;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(236, 72, 153, 0.24);
+}
+
+.quadrant-details .copy-button.copied {
+  background: rgba(74, 222, 128, 0.28);
+  color: #166534;
+}
+
+.quadrant-details .copy-button.error {
+  background: rgba(248, 113, 113, 0.28);
+  color: #7f1d1d;
+}
+
+.additional-details {
+  margin-top: 12px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+.additional-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #4c0b2f;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  position: relative;
+  padding-right: 28px;
+  margin-bottom: 12px;
+}
+
+.additional-details summary::marker {
+  display: none;
+}
+
+.additional-details summary::after {
+  content: '+';
+  font-weight: 700;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.additional-details[open] summary::after {
+  content: '–';
+}
+
+.quadrant-details .details-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.quadrant-details .detail-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  border-radius: 18px;
+  padding: 18px 20px;
+  color: #4c0b2f;
+  box-shadow: 0 16px 28px rgba(236, 72, 153, 0.18);
+}
+
+.quadrant-details .detail-card-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(76, 11, 47, 0.7);
+  margin: 0 0 12px;
+}
+
+.quadrant-details .detail-card .detail-row {
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(236, 72, 153, 0.2);
+}
+
+.quadrant-details .detail-card .detail-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.quadrant-sales .summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-weight: 600;
+  color: #4c0b2f;
+}
+
+.quadrant-sales .summary span {
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  padding: 6px 16px;
+}
+
+.quadrant-sales .table-wrapper {
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.quadrant-sales table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.quadrant-sales th,
+.quadrant-sales td {
+  padding: 12px 16px;
+  text-align: left;
+  color: #421029;
+  border-bottom: 1px solid rgba(236, 72, 153, 0.15);
+}
+
+.quadrant-sales thead {
+  background: rgba(236, 72, 153, 0.12);
+}
+
+.quadrant-sales thead th {
+  font-weight: 600;
+  color: #4c0b2f;
+}
+
+.quadrant-sales tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.quadrant-sales tbody tr:hover {
+  background: rgba(236, 72, 153, 0.08);
+}
+
+.quadrant-sales .empty {
+  padding: 18px;
+  text-align: center;
+  font-style: italic;
+  color: rgba(76, 11, 47, 0.7);
+}
+
+@media (max-width: 720px) {
+  .pinklover-body {
+    padding: 32px 0;
+  }
+
+  .quadrant {
+    padding: clamp(24px, 8vw, 32px);
+  }
+
+  .quadrant-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logout-button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .quadrant-form .actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ghost-button {
+    width: 100%;
+  }
+
+  .sales-form .button-row {
+    flex-direction: column;
+  }
+
+  .sales-form .button-row button {
+    width: 100%;
+  }
 }
 
 .pinklover-container {
