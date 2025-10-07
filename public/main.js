@@ -1015,14 +1015,25 @@
 
     const updateSaleComputedFields = () => {
       if (!saleGrossInput || !saleDiscountInput || !saleNetInput || !saleCommissionInput) return;
+      const hasGrossValue = saleGrossInput.value !== '';
+      const hasDiscountValue = saleDiscountInput.value !== '';
+      if (!hasGrossValue && !hasDiscountValue) {
+        saleNetInput.value = '';
+        saleCommissionInput.value = '';
+        return;
+      }
+
       const gross = Number(saleGrossInput.value || 0);
       const discount = Number(saleDiscountInput.value || 0);
       const influencer = getInfluencerByCoupon(saleCouponSelect?.value || '');
       const commissionRate = influencer?.commission_rate != null ? Number(influencer.commission_rate) : 0;
-      const net = Math.max(0, gross - Math.max(0, discount));
-      const commission = net * (commissionRate / 100);
-      saleNetInput.value = net ? net.toFixed(2) : '';
-      saleCommissionInput.value = commission ? commission.toFixed(2) : '';
+      const safeGross = Number.isFinite(gross) ? gross : 0;
+      const safeDiscount = Number.isFinite(discount) ? discount : 0;
+      const net = Math.max(0, safeGross - Math.max(0, safeDiscount));
+      const rate = Number.isFinite(commissionRate) ? commissionRate : 0;
+      const commission = Math.max(0, net * rate / 100);
+      saleNetInput.value = net.toFixed(2);
+      saleCommissionInput.value = commission.toFixed(2);
     };
 
     const renderSalesTable = () => {
@@ -1074,11 +1085,17 @@
         return;
       }
       salesSummaryEl.innerHTML = '';
-      const totalNet = document.createElement('span');
-      totalNet.textContent = `Total liquido: ${formatCurrency(summary.total_net)}`;
-      const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Comissao total: ${formatCurrency(summary.total_commission)}`;
-      salesSummaryEl.append(totalNet, totalCommission);
+      const summaryItems = [
+        `Total líquido: ${formatCurrency(summary.total_net)}`,
+        `Comissão total: ${formatCurrency(summary.total_commission)}`,
+        `Comissão do cupom: ${formatPercentage(summary.commission_rate)}`,
+        `Registros: ${sales.length}`
+      ];
+      summaryItems.forEach((text) => {
+        const badge = document.createElement('span');
+        badge.textContent = text;
+        salesSummaryEl.appendChild(badge);
+      });
     };
 
     const resetSaleForm = ({ clearMessage = false, keepCoupon = true } = {}) => {

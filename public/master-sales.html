@@ -1,71 +1,118 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Registrar venda | Sistema Influenciadoras</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
     <script defer src="main.js"></script>
   </head>
-  <body data-page="master-sales">
-    <div class="container">
-      <header>
-        <h1>Registrar venda</h1>
-        <p>Associe as vendas aos cupons das influenciadoras.</p>
-        <button type="button" data-action="logout">Sair</button>
-      </header>
-
-      <section class="card">
-        <div class="link-grid" style="margin-bottom:16px;">
-          <a class="link-card" href="master-create.html">Cadastrar</a>
-          <a class="link-card" href="master-consult.html">Consulta</a>
-          <a class="link-card" href="master-list.html">Lista cadastrada</a>
+  <body data-page="master-sales" class="pinklover-body">
+    <main class="influencer-layout master-sales-layout" aria-live="polite">
+      <section class="quadrant quadrant-welcome" aria-labelledby="welcomeTitle">
+        <div>
+          <p class="eyebrow">Central Master</p>
+          <h1 id="welcomeTitle">Bem-vinda à central de vendas</h1>
+          <p class="intro">
+            Organize as vendas vinculadas às influenciadoras, valide cupons ativos e acompanhe os
+            resultados em tempo real.
+          </p>
         </div>
-        <form id="createSaleForm">
-          <div class="form-grid compact">
+      </section>
+
+      <section class="quadrant quadrant-form" aria-labelledby="formTitle">
+        <div class="quadrant-header">
+          <div>
+            <h2 id="formTitle">Registrar nova venda</h2>
+            <p class="subtitle">
+              Escolha o cupom e preencha os valores. Os totais são calculados automaticamente.
+            </p>
+          </div>
+          <button type="button" data-action="logout" class="logout-button">Sair</button>
+        </div>
+
+        <nav class="link-grid actions-grid" aria-label="Atalhos do painel master">
+          <a class="link-card" href="master-create.html">Cadastrar influenciadora</a>
+          <a class="link-card" href="master-consult.html">Consultar cupons</a>
+          <a class="link-card" href="master-list.html">Lista de influenciadoras</a>
+        </nav>
+
+        <div id="salesMessage" class="message" aria-live="polite"></div>
+
+        <form id="createSaleForm" class="sales-form">
+          <div class="form-grid sales-fields">
             <label>
               Cupom*
               <select name="saleCoupon" id="saleCouponSelect" required>
                 <option value="">Selecione um cupom</option>
               </select>
             </label>
-            <label>Data*<input name="saleDate" type="date" required /></label>
-            <label>Valor bruto*<input name="grossValue" type="number" min="0" step="0.01" required /></label>
-            <label>Desconto<input name="discountValue" type="number" min="0" step="0.01" /></label>
-            <label>Valor liquido<input name="netValue" type="number" min="0" step="0.01" readonly /></label>
-            <label>Comissao calculada<input name="commissionValue" type="number" min="0" step="0.01" readonly /></label>
+            <label>
+              Data*
+              <input name="saleDate" type="date" required />
+            </label>
+            <label>
+              Valor bruto*
+              <input name="grossValue" type="number" min="0" step="0.01" inputmode="decimal" required />
+            </label>
+            <label>
+              Desconto
+              <input name="discountValue" type="number" min="0" step="0.01" inputmode="decimal" />
+            </label>
           </div>
+
+          <div class="totals-grid">
+            <label class="total-field">
+              <span class="total-label">Valor líquido</span>
+              <input name="netValue" type="number" min="0" step="0.01" readonly />
+            </label>
+            <label class="total-field">
+              <span class="total-label">Comissão calculada</span>
+              <input name="commissionValue" type="number" min="0" step="0.01" readonly />
+            </label>
+          </div>
+
           <div class="button-row">
             <button type="submit">Registrar venda</button>
-            <button type="button" class="secondary-button" id="cancelSaleEditButton">Cancelar edicao</button>
+            <button type="button" class="secondary-button" id="cancelSaleEditButton">Cancelar edição</button>
           </div>
         </form>
-        <div id="salesMessage" class="message" aria-live="polite"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px;">
+      </section>
+
+      <section class="quadrant quadrant-sales master-sales-history" aria-labelledby="historyTitle">
+        <div class="quadrant-header">
           <div>
-            <h2>Vendas cadastradas</h2>
-            <p class="note">Use os botoes para editar ou excluir.</p>
+            <h2 id="historyTitle">Histórico de vendas</h2>
+            <p class="subtitle">Edite ou exclua lançamentos rapidamente.</p>
           </div>
-          <button type="button" id="reloadSalesButton">Recarregar vendas</button>
+          <button type="button" id="reloadSalesButton" class="ghost-button">Recarregar lista</button>
         </div>
+
+        <div id="salesSummary" class="summary"></div>
+
         <div class="table-wrapper">
-          <table id="salesTable">
+          <table id="salesTable" class="sales-table">
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Cupom</th>
-                <th>Bruto</th>
-                <th>Desconto</th>
-                <th>Liquido</th>
-                <th>Comissao</th>
-                <th>Acoes</th>
+                <th scope="col">Data</th>
+                <th scope="col">Cupom</th>
+                <th scope="col">Bruto</th>
+                <th scope="col">Desconto</th>
+                <th scope="col">Líquido</th>
+                <th scope="col">Comissão</th>
+                <th scope="col">Ações</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
-        <div id="salesSummary" class="summary"></div>
       </section>
-    </div>
+    </main>
   </body>
 </html>
