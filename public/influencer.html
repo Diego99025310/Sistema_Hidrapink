@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel Influenciadora | HidraPink</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="influencer" class="pinklover-body">
+    <div class="pinklover-container" id="influencerPage">
+      <header class="pinklover-hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <h1 class="hero-title">Bem-vinda, Pinklover!</h1>
+          <p class="hero-subtitle">Acompanhe seus resultados.</p>
+          <button type="button" data-action="logout" class="hero-logout">Sair do painel</button>
+        </div>
+      </header>
+      <main class="pinklover-main">
+        <section class="card pinklover-card">
+          <div class="card-header">
+            <h2>Meus dados</h2>
+            <span class="badge">Perfil atualizado</span>
+          </div>
+          <div id="influencerDetails" class="details"></div>
+          <div id="influencerMessage" class="message" aria-live="polite"></div>
+        </section>
+        <section class="card pinklover-card">
+          <div class="card-header">
+            <h2>Minhas vendas</h2>
+            <span class="badge badge-soft">Performance</span>
+          </div>
+          <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
+          <div class="table-wrapper">
+            <table id="influencerSalesTable" class="pinklover-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Bruto</th>
+                  <th>Desconto</th>
+                  <th>Liquido</th>
+                  <th>Comissão</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="influencerSalesSummary" class="summary summary-highlight"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
