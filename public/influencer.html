@@ -14,24 +14,19 @@
     <script defer src="main.js"></script>
   </head>
   <body data-page="influencer" class="pinklover-body">
-    <main id="influencerPage" class="influencer-layout" aria-live="polite">
-      <section class="quadrant quadrant-welcome">
+    <main id="influencerPage" class="pinklover-dashboard" aria-live="polite">
+      <section class="panel panel-welcome">
         <h1>Bem vinda, Pinklover.</h1>
       </section>
 
-      <section class="quadrant quadrant-details" aria-labelledby="detailsTitle">
-        <div class="quadrant-header">
-          <h2 id="detailsTitle">Dados principais</h2>
-          <button type="button" data-action="logout" class="logout-button">
-            Sair do painel
-          </button>
-        </div>
+      <section class="panel panel-details" aria-labelledby="detailsTitle">
+        <h2 id="detailsTitle">Dados principais</h2>
         <div id="influencerMessage" class="message" aria-live="polite"></div>
-        <div id="influencerDetails" class="details"></div>
+        <div id="influencerDetails" class="details-list"></div>
       </section>
 
-      <section class="quadrant quadrant-sales" aria-labelledby="salesTitle">
-        <h2 id="salesTitle">Histórico de vendas</h2>
+      <section class="panel panel-sales" aria-labelledby="salesTitle">
+        <h2 id="salesTitle">Acompanhe seu desempenho.</h2>
         <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
         <div id="influencerSalesSummary" class="summary"></div>
         <div class="table-wrapper">

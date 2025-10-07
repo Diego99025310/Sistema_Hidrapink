@@ -1306,8 +1306,13 @@
   const renderInfluencerDetails = (container, data) => {
     if (!container) return;
     container.innerHTML = '';
+    container.classList.remove('details-empty');
     if (!data) {
-      container.textContent = 'Nenhum dado encontrado.';
+      const emptyState = document.createElement('p');
+      emptyState.className = 'details-empty-text';
+      emptyState.textContent = 'Nenhum dado encontrado.';
+      container.appendChild(emptyState);
+      container.classList.add('details-empty');
       return;
     }
 
@@ -1393,12 +1398,12 @@
     highlightWrapper.className = 'details-highlight';
 
     highlightFields.forEach(([label, value]) => {
-      const row = document.createElement('p');
+      const row = document.createElement('div');
       row.className = 'detail-row highlight-row';
 
-      const labelEl = document.createElement('strong');
+      const labelEl = document.createElement('span');
       labelEl.className = 'detail-label';
-      labelEl.textContent = label;
+      labelEl.textContent = `${label}:`;
       row.appendChild(labelEl);
 
       const valueEl = createValueElement(value);
@@ -1478,7 +1483,7 @@
 
         const labelEl = document.createElement('strong');
         labelEl.className = 'detail-label';
-        labelEl.textContent = label;
+        labelEl.textContent = `${label}:`;
         row.appendChild(labelEl);
 
         const valueEl = createValueElement(value);
