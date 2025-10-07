@@ -33,22 +33,25 @@
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        padding: 32px 16px 48px;
+        padding: 48px 16px 56px;
       }
 
       .pinklover-container {
         width: 100%;
         max-width: 600px;
+        display: flex;
+        flex-direction: column;
+        gap: 36px;
       }
 
       .pinklover-content {
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 32px;
       }
 
       .pinklover-banner {
-        background: var(--pink-strong);
+        background: linear-gradient(115deg, var(--pink-strong), var(--pink-light));
         color: #2d0d1b;
         text-align: center;
         font-weight: 700;
@@ -56,14 +59,34 @@
         padding: 18px 24px;
         border-radius: 22px;
         box-shadow: var(--shadow);
+        margin: 0;
+        letter-spacing: 0.02em;
       }
 
       .card {
         background: linear-gradient(135deg, var(--pink-strong), var(--pink-light));
         border-radius: 26px;
-        padding: 24px 24px 28px;
+        padding: 28px 28px 32px;
         box-shadow: var(--shadow);
         color: #2d0d1b;
+        position: relative;
+        overflow: hidden;
+        z-index: 0;
+      }
+
+      .card::before {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .card > * {
+        position: relative;
+        z-index: 1;
       }
 
       .card h2 {
@@ -73,8 +96,14 @@
         text-align: center;
       }
 
+      .logout-wrapper {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+
       .logout-button {
-        margin: 20px auto 0;
+        margin: 0;
         background: #ffffff;
         color: var(--pink-strong);
         border: none;
@@ -164,12 +193,6 @@
         margin-bottom: 18px;
       }
 
-      .sales-header p {
-        margin: 0;
-        text-align: center;
-        font-weight: 600;
-      }
-
       .table-wrapper {
         overflow-x: auto;
         background: rgba(255, 255, 255, 0.3);
@@ -220,10 +243,17 @@
         padding: 24px 16px;
       }
 
-      .sales-message {
-        margin: 16px 0;
+      .sales-message,
+      .influencer-message {
+        margin: 16px 0 0;
         text-align: center;
         font-weight: 500;
+      }
+
+      .sales-message:empty,
+      .influencer-message:empty {
+        display: none;
+        margin: 0;
       }
 
       .influencer-message[data-type='success'],
@@ -264,17 +294,31 @@
         text-decoration: underline;
       }
 
+      @media (max-width: 768px) {
+        body {
+          padding: 40px 16px 48px;
+        }
+
+        .pinklover-container {
+          gap: 30px;
+        }
+      }
+
       @media (max-width: 480px) {
         body {
-          padding: 24px 12px 32px;
+          padding: 32px 12px 40px;
+        }
+
+        .pinklover-content {
+          gap: 26px;
         }
 
         .card {
-          padding: 20px 18px 24px;
+          padding: 22px 20px 26px;
         }
 
         table {
-          min-width: 360px;
+          min-width: 320px;
         }
       }
     </style>
@@ -288,13 +332,11 @@
           <h2 id="influencer-info-title">Suas informações</h2>
           <div id="influencerDetails" class="influencer-info"></div>
           <div id="influencerMessage" class="influencer-message" aria-live="polite"></div>
-          <button type="button" data-action="logout" class="logout-button">Sair do painel</button>
         </section>
 
         <section class="card" aria-labelledby="influencer-sales-title">
           <div class="sales-header">
             <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
-            <p>Veja suas vendas e status atualizados em tempo real.</p>
           </div>
           <div id="influencerSalesMessage" class="sales-message" aria-live="polite"></div>
           <div class="table-wrapper">
@@ -313,6 +355,10 @@
           <div id="influencerSalesSummary" class="summary"></div>
         </section>
       </main>
+
+      <div class="logout-wrapper">
+        <button type="button" data-action="logout" class="logout-button">Sair do painel</button>
+      </div>
     </div>
   </body>
 </html>

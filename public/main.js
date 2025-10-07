@@ -1467,7 +1467,7 @@
           renderSalesSummary(null);
         }
         if (!salesData?.length) {
-          setMessage(salesMessageEl, 'Nenhuma venda registrada ate o momento.', 'info');
+          setMessage(salesMessageEl, '', '');
         } else {
           setMessage(salesMessageEl, 'Vendas atualizadas com sucesso.', 'success');
         }
@@ -1495,7 +1495,7 @@
           return;
         }
         renderInfluencerDetails(detailsEl, formatInfluencerDetails(influencer));
-        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover! ??', 'success');
+        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover! 💗', 'success');
         loadInfluencerSales(influencer.id);
       } catch (error) {
         if (error.status === 401) {
