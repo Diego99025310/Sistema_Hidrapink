@@ -16,6 +16,52 @@
       </header>
 
       <section class="card">
+        <h2>Importar vendas por período</h2>
+        <p class="note">
+          Faça o upload do arquivo JSON exportado da plataforma, informe a data de referência do período e importaremos todas as
+          vendas dos cupons cadastrados. Depois da importação você ainda poderá editar cada registro individualmente.
+        </p>
+        <form id="importSalesForm">
+          <div class="form-grid compact">
+            <label>
+              Data de referência*
+              <input id="importReferenceDate" name="referenceDate" type="date" required />
+            </label>
+            <label>
+              Arquivo JSON*
+              <input id="importSalesFile" name="salesFile" type="file" accept="application/json" required />
+            </label>
+          </div>
+          <p class="note">
+            A data informada será aplicada a todas as vendas importadas. Você poderá ajustar a data diretamente no registro caso
+            precise de mais detalhes do período.
+          </p>
+          <div class="button-row">
+            <button type="submit">Importar vendas</button>
+            <button type="button" class="secondary-button" id="clearImportButton">Limpar</button>
+          </div>
+        </form>
+        <div id="importSalesMessage" class="message" aria-live="polite"></div>
+        <div id="importSummary" class="summary hidden" aria-live="polite"></div>
+        <div id="importPreview" class="table-wrapper hidden" aria-live="polite">
+          <table id="importPreviewTable">
+            <thead>
+              <tr>
+                <th>Cupom</th>
+                <th>Influenciadora</th>
+                <th>Pedidos</th>
+                <th>Bruto</th>
+                <th>Desconto</th>
+                <th>Liquido</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
         <div class="link-grid" style="margin-bottom:16px;">
           <a class="link-card" href="master-create.html">Cadastrar</a>
           <a class="link-card" href="master-consult.html">Consulta</a>
