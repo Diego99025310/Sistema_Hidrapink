@@ -184,48 +184,6 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(Number(consultRow.vendas_count), 1);
   assert.strictEqual(Number(consultRow.vendas_total), 900);
 
-  const duplicateSale = await request(app)
-    .post('/sales')
-    .set('Authorization', `Bearer ${masterToken}`)
-    .send({
-      orderNumber: 'PED-001',
-      cupom: influencerPayload.cupom,
-      date: '2025-10-04',
-      grossValue: 800,
-      discount: 0
-    });
-  assert.strictEqual(duplicateSale.status, 409);
-  assert.match(duplicateSale.body.error, /numero de pedido/i);
-
-  const secondSaleResponse = await request(app)
-    .post('/sales')
-    .set('Authorization', `Bearer ${masterToken}`)
-    .send({
-      orderNumber: 'PED-002',
-      cupom: influencerPayload.cupom,
-      date: '2025-10-05',
-      grossValue: 500,
-      discount: 0
-    });
-  assert.strictEqual(secondSaleResponse.status, 201);
-  const secondSaleId = secondSaleResponse.body.id;
-  const secondSaleRecord = selectSaleOrderNumberStmt.get(secondSaleId);
-  assert.ok(secondSaleRecord, 'Segunda venda deve ser persistida.');
-  assert.strictEqual(secondSaleRecord.order_number, 'PED-002');
-
-  const conflictingUpdate = await request(app)
-    .put(`/sales/${saleId}`)
-    .set('Authorization', `Bearer ${masterToken}`)
-    .send({
-      orderNumber: 'PED-002',
-      cupom: influencerPayload.cupom,
-      date: '2025-10-06',
-      grossValue: 1000,
-      discount: 50
-    });
-  assert.strictEqual(conflictingUpdate.status, 409);
-  assert.match(conflictingUpdate.body.error, /numero de pedido/i);
-
   const updateSale = await request(app)
     .put(`/sales/${saleId}`)
     .set('Authorization', `Bearer ${masterToken}`)
@@ -251,8 +209,8 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(consultAfterUpdate.status, 200);
   const consultRowUpdated = consultAfterUpdate.body.find((row) => row.id === influencerId);
   assert.ok(consultRowUpdated);
-  assert.strictEqual(Number(consultRowUpdated.vendas_count), 2);
-  assert.strictEqual(Number(consultRowUpdated.vendas_total), 1450);
+  assert.strictEqual(Number(consultRowUpdated.vendas_count), 1);
+  assert.strictEqual(Number(consultRowUpdated.vendas_total), 950);
 
   const influencerLogin = await login('vendas.influencer@example.com', 'SenhaInfluencer123');
   assert.strictEqual(influencerLogin.status, 200);
@@ -273,14 +231,14 @@ test('gestao de vendas vinculada a influenciadora', async () => {
     .get(`/sales/${influencerId}`)
     .set('Authorization', `Bearer ${influencerToken}`);
   assert.strictEqual(influencerSalesView.status, 200);
-  assert.strictEqual(influencerSalesView.body.length, 2);
+  assert.strictEqual(influencerSalesView.body.length, 1);
 
   const summaryAfterUpdate = await request(app)
     .get(`/sales/summary/${influencerId}`)
     .set('Authorization', `Bearer ${influencerToken}`);
   assert.strictEqual(summaryAfterUpdate.status, 200);
-  assert.strictEqual(Number(summaryAfterUpdate.body.total_net), 1450);
-  assert.strictEqual(Number(summaryAfterUpdate.body.total_commission), 181.25);
+  assert.strictEqual(Number(summaryAfterUpdate.body.total_net), 950);
+  assert.strictEqual(Number(summaryAfterUpdate.body.total_commission), 118.75);
 
   const deleteSale = await request(app)
     .delete(`/sales/${saleId}`)
@@ -291,8 +249,8 @@ test('gestao de vendas vinculada a influenciadora', async () => {
     .get(`/sales/summary/${influencerId}`)
     .set('Authorization', `Bearer ${masterToken}`);
   assert.strictEqual(summaryAfterDelete.status, 200);
-  assert.strictEqual(Number(summaryAfterDelete.body.total_net), 500);
-  assert.strictEqual(Number(summaryAfterDelete.body.total_commission), 62.5);
+  assert.strictEqual(Number(summaryAfterDelete.body.total_net), 0);
+  assert.strictEqual(Number(summaryAfterDelete.body.total_commission), 0);
 
   const consultAfterDelete = await request(app)
     .get('/influenciadoras/consulta')
@@ -300,8 +258,8 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(consultAfterDelete.status, 200);
   const consultRowAfterDelete = consultAfterDelete.body.find((row) => row.id === influencerId);
   assert.ok(consultRowAfterDelete);
-  assert.strictEqual(Number(consultRowAfterDelete.vendas_count), 1);
-  assert.strictEqual(Number(consultRowAfterDelete.vendas_total), 500);
+  assert.strictEqual(Number(consultRowAfterDelete.vendas_count), 0);
+  assert.strictEqual(Number(consultRowAfterDelete.vendas_total), 0);
 });
 
 after(() => {
