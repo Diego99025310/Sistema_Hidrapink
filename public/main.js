@@ -1150,6 +1150,7 @@
     let currentSalesInfluencerId = null;
     let saleEditingId = null;
     let pendingImportEntries = [];
+    const influencerSalesCache = new Map();
 
     const showElement = (element) => {
       element?.classList?.remove('hidden');
@@ -1713,16 +1714,78 @@
       });
     };
 
-    const fetchExistingOrders = async (orderCodes = []) => {
-      const unique = Array.from(new Set(orderCodes.filter(Boolean)));
-      if (!unique.length) return [];
+    const rememberInfluencerSales = (influencerId, salesRows = []) => {
+      if (!Number.isInteger(influencerId)) return;
+      influencerSalesCache.set(influencerId, Array.isArray(salesRows) ? salesRows : []);
+    };
+
+    const getCachedInfluencerSales = (influencerId) => {
+      if (!Number.isInteger(influencerId)) return null;
+      return influencerSalesCache.has(influencerId) ? influencerSalesCache.get(influencerId) : null;
+    };
+
+    const fetchExistingOrders = async (rows = []) => {
+      const normalizedCodes = Array.from(
+        new Set(
+          (Array.isArray(rows) ? rows : [])
+            .map((row) => row?.orderCodeNormalized || row?.orderCode || '')
+            .filter(Boolean)
+        )
+      );
+      if (!normalizedCodes.length) return [];
       try {
-        const response = await apiFetch('/sales/check-orders', { method: 'POST', body: { orders: unique } });
+        const response = await apiFetch('/sales/check-orders', { method: 'POST', body: { orders: normalizedCodes } });
         return Array.isArray(response) ? response : [];
       } catch (error) {
         if (error.status === 401) {
           logout();
           return [];
+        }
+        if (error.status === 404) {
+          const influencerIds = Array.from(
+            new Set(
+              (Array.isArray(rows) ? rows : [])
+                .map((row) => (Number.isInteger(row?.influencerId) ? row.influencerId : null))
+                .filter((value) => value !== null)
+            )
+          );
+
+          if (!influencerIds.length) {
+            return [];
+          }
+
+          const resultsMap = new Map();
+          for (const influencerId of influencerIds) {
+            let influencerSales = getCachedInfluencerSales(influencerId);
+            if (!Array.isArray(influencerSales)) {
+              try {
+                const fetched = await apiFetch(`/sales/${influencerId}`);
+                influencerSales = Array.isArray(fetched) ? fetched : [];
+                rememberInfluencerSales(influencerId, influencerSales);
+              } catch (fallbackError) {
+                if (fallbackError.status === 401) {
+                  logout();
+                  return [];
+                }
+                throw fallbackError;
+              }
+            }
+
+            influencerSales
+              .filter((sale) => sale?.order_code)
+              .forEach((sale) => {
+                const key = normalizeOrderCode(sale.order_code);
+                if (!key || resultsMap.has(key)) return;
+                resultsMap.set(key, {
+                  sale_id: sale.id,
+                  order_code: sale.order_code,
+                  date: sale.date,
+                  cupom: sale.cupom
+                });
+              });
+          }
+
+          return Array.from(resultsMap.values());
         }
         throw error;
       }
@@ -1884,9 +1947,7 @@
 
           markFileDuplicates(normalizedEntries);
 
-          const existingOrders = await fetchExistingOrders(
-            normalizedEntries.map((item) => item.orderCodeNormalized)
-          );
+          const existingOrders = await fetchExistingOrders(normalizedEntries);
           flagExistingOrders(normalizedEntries, existingOrders);
 
           pendingImportEntries = normalizedEntries;
@@ -2113,6 +2174,7 @@
       try {
         const salesData = await apiFetch(`/sales/${influencerId}`);
         sales = Array.isArray(salesData) ? salesData : [];
+        rememberInfluencerSales(influencerId, sales);
         renderSalesTable();
         try {
           const summary = await apiFetch(`/sales/summary/${influencerId}`);
