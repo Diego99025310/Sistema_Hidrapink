@@ -9,15 +9,145 @@
     userEmail: 'userEmail'
   };
 
-  const storage = (() => {
+  const createMemoryStorage = () => {
+    const store = new Map();
+    return {
+      getItem(key) {
+        if (!store.size) return null;
+        const normalizedKey = String(key);
+        return store.has(normalizedKey) ? store.get(normalizedKey) : null;
+      },
+      setItem(key, value) {
+        if (key == null) return;
+        const normalizedKey = String(key);
+        const normalizedValue = value == null ? '' : String(value);
+        store.set(normalizedKey, normalizedValue);
+      },
+      removeItem(key) {
+        if (key == null) return;
+        store.delete(String(key));
+      }
+    };
+  };
+
+  const createCookieStorage = () => {
     try {
-      return window.sessionStorage;
+      const testKey = '__hidrapink_cookie__';
+      document.cookie = `${encodeURIComponent(testKey)}=1; path=/; SameSite=Lax`;
+      const enabled = document.cookie.includes(`${encodeURIComponent(testKey)}=1`);
+      document.cookie = `${encodeURIComponent(testKey)}=; Max-Age=0; path=/; SameSite=Lax`;
+      if (!enabled) {
+        return null;
+      }
     } catch (error) {
+      return null;
+    }
+
+    const getCookie = (key) => {
+      const encodedKey = `${encodeURIComponent(key)}=`;
+      const parts = document.cookie ? document.cookie.split('; ') : [];
+      const match = parts.find((part) => part.startsWith(encodedKey));
+      return match ? decodeURIComponent(match.slice(encodedKey.length)) : null;
+    };
+
+    return {
+      getItem(key) {
+        if (!key) return null;
+        return getCookie(String(key));
+      },
+      setItem(key, value) {
+        if (!key) return;
+        const normalizedValue = value == null ? '' : String(value);
+        document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(normalizedValue)}; path=/; SameSite=Lax`;
+      },
+      removeItem(key) {
+        if (!key) return;
+        document.cookie = `${encodeURIComponent(key)}=; Max-Age=0; path=/; SameSite=Lax`;
+      }
+    };
+  };
+
+  const storage = (() => {
+    const memoryStorage = createMemoryStorage();
+
+    if (typeof window === 'undefined') {
+      return memoryStorage;
+    }
+
+    let cookieStorage = null;
+    const ensureCookieStorage = () => {
+      if (!cookieStorage) {
+        cookieStorage = createCookieStorage();
+      }
+      return cookieStorage;
+    };
+
+    try {
+      const raw = window.sessionStorage;
+      const testKey = '__hidrapink_session__';
+      raw.setItem(testKey, '1');
+      raw.removeItem(testKey);
+
       return {
-        getItem: () => null,
-        setItem: () => {},
-        removeItem: () => {}
+        getItem(key) {
+          if (!key) return null;
+          const normalizedKey = String(key);
+          let value = null;
+          try {
+            value = raw.getItem(normalizedKey);
+          } catch (error) {
+            value = null;
+          }
+          if (value !== null && value !== undefined) {
+            return value;
+          }
+          if (cookieStorage) {
+            const cookieValue = cookieStorage.getItem(normalizedKey);
+            if (cookieValue !== null && cookieValue !== undefined) {
+              return cookieValue;
+            }
+          }
+          return memoryStorage.getItem(normalizedKey);
+        },
+        setItem(key, value) {
+          if (!key) return;
+          const normalizedKey = String(key);
+          const normalizedValue = value == null ? '' : String(value);
+          try {
+            raw.setItem(normalizedKey, normalizedValue);
+            if (cookieStorage) {
+              cookieStorage.removeItem(normalizedKey);
+            }
+            memoryStorage.removeItem(normalizedKey);
+          } catch (error) {
+            const fallback = ensureCookieStorage();
+            if (fallback) {
+              fallback.setItem(normalizedKey, normalizedValue);
+            } else {
+              memoryStorage.setItem(normalizedKey, normalizedValue);
+            }
+          }
+        },
+        removeItem(key) {
+          if (!key) return;
+          const normalizedKey = String(key);
+          try {
+            raw.removeItem(normalizedKey);
+          } catch (error) {
+            // ignore
+          }
+          if (cookieStorage) {
+            cookieStorage.removeItem(normalizedKey);
+          }
+          memoryStorage.removeItem(normalizedKey);
+        }
       };
+    } catch (error) {
+      const fallback = ensureCookieStorage();
+      if (fallback) {
+        return fallback;
+      }
+      return memoryStorage;
     }
   })();
 
@@ -1881,685 +2011,6 @@
         clearImportState();
         setMessage(importMessageEl, 'Importação cancelada.', 'info');
       });
-
-    const showElement = (element) => {
-      element?.classList?.remove('hidden');
-    };
-
-    const hideElement = (element) => {
-      element?.classList?.add('hidden');
-    };
-
-    const readFileAsText = (file) => {
-      if (!file) return Promise.resolve('');
-      if (typeof file.text === 'function') {
-        return file.text();
-      }
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result || '');
-        reader.onerror = () => reject(reader.error || new Error('Falha ao ler o arquivo.'));
-        reader.readAsText(file);
-      });
-    };
-
-    const getNestedValue = (object, path) => {
-      if (!object || typeof object !== 'object') return undefined;
-      const parts = String(path)
-        .split('.')
-        .map((part) => part.trim())
-        .filter(Boolean);
-      if (!parts.length) return undefined;
-      let value = object;
-      for (const part of parts) {
-        if (value && typeof value === 'object' && part in value) {
-          value = value[part];
-        } else {
-          return undefined;
-        }
-      }
-      return value;
-    };
-
-    const findValueByKeys = (object, keys = []) => {
-      if (!object || typeof object !== 'object') return undefined;
-      for (const key of keys) {
-        if (!key) continue;
-        const value = key.includes('.') ? getNestedValue(object, key) : object[key];
-        if (value !== undefined && value !== null) {
-          return value;
-        }
-      }
-      return undefined;
-    };
-
-    const parseNumeric = (value) => {
-      if (value == null || value === '') return null;
-      if (typeof value === 'number') {
-        return Number.isFinite(value) ? value : null;
-      }
-      if (typeof value === 'boolean') {
-        return value ? 1 : 0;
-      }
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (!trimmed) return null;
-        let sanitized = trimmed.replace(/[^0-9.,-]/g, '');
-        if (!sanitized) return null;
-        const lastComma = sanitized.lastIndexOf(',');
-        const lastDot = sanitized.lastIndexOf('.');
-        if (lastComma > lastDot) {
-          sanitized = sanitized.replace(/\./g, '').replace(',', '.');
-        } else if (lastDot > lastComma) {
-          sanitized = sanitized.replace(/,/g, '');
-        } else {
-          sanitized = sanitized.replace(/,/g, '.');
-        }
-        const number = Number(sanitized);
-        return Number.isFinite(number) ? number : null;
-      }
-      const number = Number(value);
-      return Number.isFinite(number) ? number : null;
-    };
-
-    const parseInteger = (value) => {
-      const number = parseNumeric(value);
-      if (!Number.isFinite(number)) return null;
-      return Math.round(number);
-    };
-
-    const parseDateFromText = (value) => {
-      if (value == null) return null;
-      const text = String(value).trim();
-      if (!text) return null;
-      const cleaned = text.replace(/[\u00A0\s]+/g, ' ').trim();
-      const isoMatch = cleaned.match(/(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
-      let year;
-      let month;
-      let day;
-      if (isoMatch) {
-        year = Number(isoMatch[1]);
-        month = Number(isoMatch[2]);
-        day = Number(isoMatch[3]);
-      } else {
-        const brMatch = cleaned.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
-        if (!brMatch) return null;
-        day = Number(brMatch[1]);
-        month = Number(brMatch[2]);
-        year = Number(brMatch[3]);
-        if (year < 100) {
-          year += year >= 70 ? 1900 : 2000;
-        }
-      }
-
-      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-      const date = new Date(Date.UTC(year, month - 1, day));
-      if (Number.isNaN(date.getTime())) return null;
-      if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null;
-      const pad = (num) => String(num).padStart(2, '0');
-      return `${String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`;
-    };
-
-    const formatDateForDisplay = (value) => {
-      if (!value) return '';
-      const text = String(value).trim();
-      if (!text) return '';
-      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-        const [year, month, day] = text.split('-');
-        return `${day}/${month}/${year}`;
-      }
-      const parsed = parseDateFromText(text);
-      if (parsed) {
-        const [year, month, day] = parsed.split('-');
-        return `${day}/${month}/${year}`;
-      }
-      return text;
-    };
-
-    const normalizeHeaderKey = (value) =>
-      String(value || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '');
-
-    const detectDelimiter = (line) => {
-      if (line.includes('\t')) return '\t';
-      if (line.includes(';')) return ';';
-      if ((line.match(/\|/g) || []).length >= 3) return '|';
-      const commaCount = (line.match(/,/g) || []).length;
-      const dotCount = (line.match(/\./g) || []).length;
-      if (commaCount >= 3 && commaCount > dotCount) return ',';
-      if (/\s{2,}/.test(line)) return /\s{2,}/;
-      return /\s+/;
-    };
-
-    const splitColumns = (line, delimiter) => {
-      if (delimiter === '\t' || typeof delimiter === 'string') {
-        return line.split(delimiter).map((cell) => cell.trim());
-      }
-      if (delimiter instanceof RegExp) {
-        return line.split(delimiter).map((cell) => cell.trim());
-      }
-      return [line.trim()];
-    };
-
-    const parsePastedSalesText = (text) => {
-      if (typeof text !== 'string') return [];
-      const normalizedText = text.replace(/\r\n?/g, '\n').split('\n');
-      const lines = normalizedText.map((line) => line.trim()).filter((line) => line);
-      if (!lines.length) return [];
-
-      let headerLine = lines[0];
-      let delimiter = detectDelimiter(headerLine);
-      let headerCells = splitColumns(headerLine, delimiter);
-      const headerTypes = headerCells.map((cell) => {
-        const key = normalizeHeaderKey(cell);
-        if (!key) return null;
-        if (['name', 'pedido', 'order', 'ordem', 'numero', 'orderid', 'ordercodigo', 'ordercode'].includes(key)) return 'order';
-        if (['paidat', 'data', 'date', 'pagamento', 'paymentdate', 'datapagamento'].includes(key)) return 'date';
-        if (['subtotal', 'valor', 'total', 'amount', 'gross', 'valorbruto', 'totalpedido'].includes(key)) return 'gross';
-        if (['discountcode', 'cupom', 'coupon', 'codigodesconto', 'codigocupom'].includes(key)) return 'coupon';
-        return null;
-      });
-
-      let dataLines = lines.slice(1);
-      let columnTypes = headerTypes;
-
-      if (headerTypes.filter(Boolean).length < 2) {
-        dataLines = lines;
-        headerLine = lines[0];
-        delimiter = detectDelimiter(headerLine);
-        headerCells = splitColumns(headerLine, delimiter);
-        columnTypes = headerCells.map((_, index) => {
-          const defaults = ['order', 'date', 'gross', 'coupon'];
-          return defaults[index] || null;
-        });
-      }
-
-      if (!dataLines.length) return [];
-      if (!columnTypes.length) {
-        delimiter = detectDelimiter(dataLines[0]);
-        const firstRow = splitColumns(dataLines[0], delimiter);
-        columnTypes = firstRow.map((_, index) => {
-          const defaults = ['order', 'date', 'gross', 'coupon'];
-          return defaults[index] || null;
-        });
-      }
-
-      const entries = [];
-      dataLines.forEach((line) => {
-        if (!line) return;
-        const cells = splitColumns(line, delimiter);
-        if (!cells.some((cell) => cell)) return;
-        const entry = {};
-        columnTypes.forEach((type, index) => {
-          if (!type) return;
-          const value = cells[index] ?? '';
-          if (!value && value !== 0) return;
-          if (type === 'order') {
-            entry.order = value;
-            entry.pedido = value;
-            entry.order_id = value;
-          } else if (type === 'date') {
-            entry.paid_at = value;
-            entry.date = value;
-            entry.data = value;
-          } else if (type === 'gross') {
-            entry.subtotal = value;
-            entry.gross_value = value;
-            entry.grossSales = value;
-            entry.gross = value;
-            entry.net_value = value;
-            entry.netSales = value;
-          } else if (type === 'coupon') {
-            entry.cupom = value;
-            entry.coupon = value;
-            entry.discount_code = value;
-            entry.coupon_code = value;
-          }
-        });
-        if (Object.keys(entry).length) {
-          entry.__source = { type: 'paste', rawLine: line };
-          entries.push(entry);
-        }
-      });
-      return entries;
-    };
-
-    const extractArrayFromData = (data) => {
-      if (Array.isArray(data)) return data;
-      if (!data || typeof data !== 'object') return [];
-      const possibleKeys = [
-        'sales',
-        'vendas',
-        'data',
-        'items',
-        'pedidos',
-        'coupons',
-        'relatorio',
-        'relatorio_detalhado',
-        'report',
-        'reports',
-        'resultado',
-        'result',
-        'entries',
-        'rows',
-        'values',
-        'lista'
-      ];
-      for (const key of possibleKeys) {
-        const value = data[key];
-        if (Array.isArray(value)) return value;
-        if (value && typeof value === 'object') {
-          const nested = extractArrayFromData(value);
-          if (nested.length) return nested;
-        }
-      }
-      for (const value of Object.values(data)) {
-        if (Array.isArray(value)) return value;
-        if (value && typeof value === 'object') {
-          const nested = extractArrayFromData(value);
-          if (nested.length) return nested;
-        }
-      }
-      return [];
-    };
-
-    const normalizeImportEntries = (entries = []) => {
-      if (!Array.isArray(entries)) return [];
-      const couponKeys = ['cupom', 'coupon', 'discount_code', 'discountCode', 'code', 'coupon_code', 'couponCode', 'name'];
-      const grossKeys = [
-        'grossSales',
-        'gross_sales',
-        'gross_value',
-        'valor_bruto',
-        'valorBruto',
-        'vendas_brutas',
-        'sales_gross',
-        'amount.gross',
-        'gross'
-      ];
-      const discountKeys = [
-        'discount',
-        'discount_total',
-        'discountAmount',
-        'discount_amount',
-        'valor_desconto',
-        'desconto',
-        'descontos',
-        'amount.discount'
-      ];
-      const netKeys = [
-        'netSales',
-        'net_sales',
-        'net_value',
-        'valor_liquido',
-        'valorLiquido',
-        'vendas_liquidas',
-        'amount.net',
-        'net'
-      ];
-      const ordersKeys = ['orders', 'orders_with_discount', 'ordersWithDiscount', 'pedidos', 'total_orders', 'ordersApplied'];
-      const orderKeys = ['order', 'order_id', 'orderId', 'orderNumber', 'pedido', 'numero', 'pedido_id', 'numero_pedido', 'ordercode'];
-      const dateKeys = ['date', 'data', 'paid_at', 'paidAt', 'payment_date', 'datapagamento'];
-
-      return entries.map((entry, index) => {
-        const couponValue = findValueByKeys(entry, couponKeys);
-        const coupon = couponValue != null ? String(couponValue).trim() : '';
-        const influencer = getInfluencerByCoupon(coupon);
-
-        const orderValue = findValueByKeys(entry, orderKeys);
-        const rawDate = findValueByKeys(entry, dateKeys);
-        const parsedDate = parseDateFromText(rawDate);
-
-        let grossValue = parseNumeric(findValueByKeys(entry, grossKeys));
-        let discount = parseNumeric(findValueByKeys(entry, discountKeys));
-        let netValue = parseNumeric(findValueByKeys(entry, netKeys));
-        const orders = parseInteger(findValueByKeys(entry, ordersKeys));
-
-        if (!Number.isFinite(grossValue) && Number.isFinite(netValue) && Number.isFinite(discount)) {
-          grossValue = netValue + discount;
-        }
-
-        if (!Number.isFinite(netValue) && Number.isFinite(grossValue) && Number.isFinite(discount)) {
-          netValue = grossValue - discount;
-        }
-
-        if (!Number.isFinite(discount) && Number.isFinite(grossValue) && Number.isFinite(netValue)) {
-          discount = Math.max(0, grossValue - netValue);
-        }
-
-        if (!Number.isFinite(grossValue) && Number.isFinite(netValue)) {
-          grossValue = netValue + Math.max(0, discount || 0);
-        }
-
-        if (!Number.isFinite(netValue) && Number.isFinite(grossValue)) {
-          netValue = grossValue - Math.max(0, discount || 0);
-        }
-
-        grossValue = Number.isFinite(grossValue) ? Math.max(0, grossValue) : null;
-        discount = Number.isFinite(discount) ? Math.max(0, discount) : 0;
-        netValue = Number.isFinite(netValue) ? Math.max(0, netValue) : null;
-
-        if (grossValue == null && netValue != null) {
-          grossValue = netValue + discount;
-        }
-
-        if (netValue == null && grossValue != null) {
-          netValue = Math.max(0, grossValue - discount);
-        }
-
-        if (!Number.isFinite(netValue)) netValue = null;
-        if (!Number.isFinite(grossValue)) grossValue = null;
-
-        const result = {
-          index: index + 1,
-          entry,
-          cupom: coupon,
-          influencerId: influencer?.id || null,
-          influencerName: influencer?.nome || '',
-          orderCode: orderValue != null ? String(orderValue).trim() : '',
-          rawDate: rawDate != null ? String(rawDate).trim() : '',
-          date: parsedDate,
-          grossValue,
-          discount,
-          netValue,
-          orders: Number.isFinite(orders) ? Math.max(0, orders) : null,
-          canImport: Boolean(influencer && coupon && grossValue != null),
-          status: 'ready',
-          statusMessage: 'Pronto para importação',
-          sourceType: entry?.__source?.type || 'file'
-        };
-
-        if (!coupon) {
-          result.status = 'error';
-          result.statusMessage = 'Cupom ausente no arquivo.';
-          result.canImport = false;
-        } else if (!influencer) {
-          result.status = 'warning';
-          result.statusMessage = 'Cupom não cadastrado no sistema.';
-          result.canImport = false;
-        } else if (grossValue == null) {
-          result.status = 'error';
-          result.statusMessage = 'Valor bruto não encontrado para o cupom.';
-          result.canImport = false;
-        } else if (netValue == null) {
-          result.status = 'error';
-          result.statusMessage = 'Valor líquido não pôde ser calculado.';
-          result.canImport = false;
-        }
-
-        return result;
-      });
-    };
-
-    const renderImportPreview = (rows = []) => {
-      if (!importPreviewTableBody) return;
-      importPreviewTableBody.innerHTML = '';
-      if (!rows.length) {
-        hideElement(importPreviewWrapper);
-        hideElement(importSummaryEl);
-        return;
-      }
-
-      const fragment = document.createDocumentFragment();
-      rows.forEach((row) => {
-        const tr = document.createElement('tr');
-        tr.dataset.status = row.status || 'ready';
-        const dateLabel = row.effectiveDate
-          ? formatDateForDisplay(row.effectiveDate)
-          : row.rawDate
-          ? formatDateForDisplay(row.rawDate)
-          : '-';
-        const columns = [
-          row.orderCode || '-',
-          dateLabel || '-',
-          row.cupom || '-',
-          row.influencerName || '-',
-          row.grossValue != null ? formatCurrency(row.grossValue) : '-',
-          formatCurrency(row.discount || 0),
-          row.netValue != null ? formatCurrency(row.netValue) : '-',
-          row.statusMessage || '-'
-        ];
-        columns.forEach((value, columnIndex) => {
-          const td = document.createElement('td');
-          if (columnIndex === columns.length - 1) {
-            const badge = document.createElement('span');
-            badge.className = 'status-badge';
-            badge.dataset.status = row.status || 'ready';
-            badge.textContent = value;
-            td.appendChild(badge);
-          } else {
-            td.textContent = value;
-          }
-          tr.appendChild(td);
-        });
-        fragment.appendChild(tr);
-      });
-
-      importPreviewTableBody.appendChild(fragment);
-      showElement(importPreviewWrapper);
-
-      if (importSummaryEl) {
-        const total = rows.length;
-        const successCount = rows.filter((row) => row.status === 'success').length;
-        const readyCount = rows.filter((row) => row.status === 'ready').length;
-        const warningCount = rows.filter((row) => row.status === 'warning' || row.status === 'skipped').length;
-        const errorCount = rows.filter((row) => row.status === 'error' || row.status === 'failed').length;
-
-        importSummaryEl.innerHTML = '';
-        const summaryItems = [
-          { count: total, label: 'itens processados', status: 'info' },
-          { count: successCount, label: 'importados', status: 'success' },
-          { count: readyCount, label: 'prontos para importar', status: 'ready' },
-          { count: warningCount, label: 'com alerta', status: 'warning' },
-          { count: errorCount, label: 'com erro', status: 'error' }
-        ].filter((item) => item.count > 0);
-
-        summaryItems.forEach((item) => {
-          const span = document.createElement('span');
-          span.dataset.status = item.status;
-          span.innerHTML = `<strong>${item.count}</strong> ${item.label}`;
-          importSummaryEl.appendChild(span);
-        });
-
-        if (summaryItems.length) {
-          showElement(importSummaryEl);
-        } else {
-          hideElement(importSummaryEl);
-        }
-      }
-    };
-
-    const clearImportState = () => {
-      importSalesForm?.reset();
-      importSalesForm?.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
-      setMessage(importMessageEl, '', '');
-      hideElement(importSummaryEl);
-      hideElement(importPreviewWrapper);
-      if (importSalesFileInput) importSalesFileInput.value = '';
-      if (importSalesTextInput) importSalesTextInput.value = '';
-      if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';
-    };
-
-    const setFormBusy = (formEl, busy) => {
-      if (!formEl) return;
-      const elements = Array.from(formEl.elements || []);
-      elements.forEach((element) => {
-        if (busy) {
-          element.dataset.prevDisabled = element.disabled ? 'true' : 'false';
-          element.disabled = true;
-        } else {
-          if (element.dataset.prevDisabled !== 'true') {
-            element.disabled = false;
-          }
-          delete element.dataset.prevDisabled;
-        }
-      });
-    };
-
-    clearImportButton?.addEventListener('click', (event) => {
-      event.preventDefault();
-      clearImportState();
-    });
-
-    importSalesForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      const referenceDate = importReferenceDateInput?.value || '';
-      const file = importSalesFileInput?.files?.[0] || null;
-      const pastedText = importSalesTextInput?.value?.trim() || '';
-      const hasFile = Boolean(file);
-      const hasPastedText = Boolean(pastedText);
-
-      flagInvalidField(importSalesTextInput, hasPastedText || hasFile);
-      flagInvalidField(importSalesFileInput, hasFile || hasPastedText);
-      if (importReferenceDateInput) importReferenceDateInput.removeAttribute('aria-invalid');
-
-      if (!hasFile && !hasPastedText) {
-        setMessage(importMessageEl, 'Cole as vendas ou selecione um arquivo JSON para importar.', 'error');
-        focusFirstInvalidField(importSalesForm);
-        return;
-      }
-
-      if (!influencers.length) {
-        setMessage(importMessageEl, 'Carregando influenciadoras cadastradas. Aguarde um instante e tente novamente.', 'info');
-        await loadInfluencersForSales();
-        if (!influencers.length) {
-          setMessage(importMessageEl, 'Cadastre influenciadoras com cupom antes de importar as vendas.', 'error');
-          return;
-        }
-      }
-
-      setFormBusy(importSalesForm, true);
-      const processingMessage = hasFile && hasPastedText
-        ? 'Processando dados colados e arquivo selecionado...'
-        : hasFile
-        ? 'Lendo arquivo e preparando as vendas...'
-        : 'Processando dados colados...';
-      setMessage(importMessageEl, processingMessage, 'info');
-
-      try {
-        let rawEntries = [];
-        if (hasPastedText) {
-          rawEntries = rawEntries.concat(parsePastedSalesText(pastedText));
-        }
-        if (hasFile) {
-          const fileContent = await readFileAsText(file);
-          let parsed;
-          try {
-            parsed = JSON.parse(fileContent);
-          } catch (parseError) {
-            throw new Error('O arquivo selecionado não contém um JSON válido.');
-          }
-          rawEntries = rawEntries.concat(extractArrayFromData(parsed));
-        }
-
-        if (!rawEntries.length) {
-          throw new Error('Nenhuma venda foi encontrada nos dados informados.');
-        }
-
-        const normalizedEntries = normalizeImportEntries(rawEntries);
-
-        const needsReferenceDate = normalizedEntries.some((item) => !item.date);
-        if (needsReferenceDate && !referenceDate) {
-          flagInvalidField(importReferenceDateInput, false);
-        }
-
-        normalizedEntries
-          .filter((item) => item.status === 'warning' && !item.canImport)
-          .forEach((item) => {
-            item.status = 'skipped';
-            item.statusMessage = 'Cupom não cadastrado. Cadastre-o e tente novamente.';
-          });
-
-        normalizedEntries.forEach((item) => {
-          const effectiveDate = item.date || referenceDate || '';
-          item.effectiveDate = effectiveDate;
-          if (!effectiveDate && item.canImport) {
-            item.status = 'error';
-            item.statusMessage = 'Informe a data no relatório ou selecione uma data de referência.';
-            item.canImport = false;
-          }
-        });
-
-        renderImportPreview(normalizedEntries);
-
-        const importableEntries = normalizedEntries.filter((item) => item.canImport && item.effectiveDate);
-
-        if (!importableEntries.length) {
-          setMessage(
-            importMessageEl,
-            'Nenhuma venda está pronta para importação. Revise os avisos destacados na tabela.',
-            'error'
-          );
-          return;
-        }
-
-        setMessage(importMessageEl, 'Enviando vendas para o sistema...', 'info');
-
-        let successCount = 0;
-        let failureCount = 0;
-
-        for (const item of importableEntries) {
-          try {
-            await apiFetch('/sales', {
-              method: 'POST',
-              body: {
-                cupom: item.cupom,
-                date: item.effectiveDate,
-                grossValue: item.grossValue,
-                discount: item.discount || 0
-              }
-            });
-            item.status = 'success';
-            item.statusMessage = 'Importada com sucesso.';
-            successCount += 1;
-          } catch (error) {
-            if (error.status === 401) {
-              logout();
-              return;
-            }
-            item.status = 'failed';
-            item.statusMessage = error.message || 'Erro ao importar venda.';
-            failureCount += 1;
-          }
-        }
-
-        renderImportPreview(normalizedEntries);
-
-        if (importSalesFileInput) {
-          importSalesFileInput.value = '';
-        }
-        if (importSalesTextInput) {
-          importSalesTextInput.value = '';
-        }
-
-        if (successCount && !failureCount) {
-          setMessage(importMessageEl, `Importação concluída com ${successCount} vendas.`, 'success');
-        } else if (successCount && failureCount) {
-          setMessage(
-            importMessageEl,
-            `Importação finalizada com alertas: ${successCount} vendas criadas e ${failureCount} falharam.`,
-            'info'
-          );
-        } else {
-          setMessage(importMessageEl, 'Nenhuma venda foi importada. Verifique os dados e tente novamente.', 'error');
-        }
-
-        if (successCount && currentSalesInfluencerId) {
-          await loadSalesForInfluencer(currentSalesInfluencerId, { showStatus: false });
-          setMessage(messageEl, 'Vendas atualizadas após importação.', 'success');
-        }
-      } catch (error) {
-        setMessage(importMessageEl, error.message || 'Não foi possível processar os dados informados.', 'error');
-        hideElement(importSummaryEl);
-        hideElement(importPreviewWrapper);
-        if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';
-      } finally {
-        setFormBusy(importSalesForm, false);
-      }
-    });
 
     const getInfluencerByCoupon = (coupon) => {
       if (!coupon) return undefined;
