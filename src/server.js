@@ -149,6 +149,7 @@ const findInfluencerByCouponStmt = db.prepare(`${influencerBaseQuery} WHERE i.cu
 const insertSaleStmt = db.prepare(`
   INSERT INTO sales (
     influencer_id,
+    order_number,
     date,
     gross_value,
     discount,
@@ -156,6 +157,7 @@ const insertSaleStmt = db.prepare(`
     commission
   ) VALUES (
     @influencer_id,
+    @order_number,
     @date,
     @gross_value,
     @discount,
@@ -167,6 +169,7 @@ const insertSaleStmt = db.prepare(`
 const updateSaleStmt = db.prepare(`
   UPDATE sales SET
     influencer_id = @influencer_id,
+    order_number = @order_number,
     date = @date,
     gross_value = @gross_value,
     discount = @discount,
@@ -176,9 +179,11 @@ const updateSaleStmt = db.prepare(`
 `);
 
 const deleteSaleStmt = db.prepare('DELETE FROM sales WHERE id = ?');
+const findSaleByOrderNumberStmt = db.prepare('SELECT id FROM sales WHERE order_number = ?');
 const findSaleByIdStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -195,6 +200,7 @@ const findSaleByIdStmt = db.prepare(`
 const listSalesByInfluencerStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -422,19 +428,35 @@ const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
   return { netValue, commissionValue };
 };
 
-const formatSaleRow = (row) => ({
-  id: row.id,
-  influencer_id: row.influencer_id,
-  cupom: row.cupom || null,
-  nome: row.nome || null,
-  date: row.date,
-  gross_value: Number(row.gross_value),
-  discount: Number(row.discount),
-  net_value: Number(row.net_value),
-  commission: Number(row.commission),
-  commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
-  created_at: row.created_at
-});
+const normalizeOrderNumber = (value) => {
+  if (value == null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+};
+
+const formatSaleRow = (row) => {
+  const orderNumber = normalizeOrderNumber(
+    row?.order_number ?? row?.orderNumber ?? row?.pedido ?? null
+  );
+
+  return {
+    id: row.id,
+    influencer_id: row.influencer_id,
+    order_number: orderNumber,
+    orderNumber,
+    cupom: row.cupom || null,
+    nome: row.nome || null,
+    date: row.date,
+    gross_value: Number(row.gross_value),
+    discount: Number(row.discount),
+    net_value: Number(row.net_value),
+    commission: Number(row.commission),
+    commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
+    created_at: row.created_at
+  };
+};
 
 const createInfluencerTransaction = db.transaction((influencerPayload, userPayload) => {
   const mustChange = userPayload.mustChange ?? 0;
@@ -469,11 +491,19 @@ const ensureInfluencerAccess = (req, influencerId) => {
 };
 
 const normalizeSaleBody = (body) => {
+  const orderNumberRaw = body?.orderNumber ?? body?.order_number ?? body?.pedido ?? body?.order;
+  const orderNumber = orderNumberRaw == null ? '' : String(trimString(orderNumberRaw)).trim();
   const cupom = trimString(body?.cupom);
   const date = trimString(body?.date);
   const grossRaw = body?.grossValue ?? body?.gross_value;
   const discountRaw = body?.discount ?? body?.discountValue ?? body?.discount_value ?? 0;
 
+  if (!orderNumber) {
+    return { error: { error: 'Informe o numero do pedido.' } };
+  }
+  if (orderNumber.length > 100) {
+    return { error: { error: 'Numero do pedido deve ter no maximo 100 caracteres.' } };
+  }
   if (!cupom) {
     return { error: { error: 'Informe o cupom da influenciadora.' } };
   }
@@ -497,6 +527,7 @@ const normalizeSaleBody = (body) => {
 
   return {
     data: {
+      orderNumber,
       cupom,
       date,
       grossValue: grossParsed.value,
@@ -692,11 +723,17 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
+  const existingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
+  if (existingSale) {
+    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+  }
+
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
     const result = insertSaleStmt.run({
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
@@ -706,6 +743,9 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     const created = findSaleByIdStmt.get(result.lastInsertRowid);
     return res.status(201).json(formatSaleRow(created));
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
+      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+    }
     console.error('Erro ao cadastrar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a venda.' });
   }
@@ -732,12 +772,18 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
+  const conflictingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
+  if (conflictingSale && conflictingSale.id !== saleId) {
+    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+  }
+
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
     updateSaleStmt.run({
       id: saleId,
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
@@ -748,6 +794,9 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     const updated = findSaleByIdStmt.get(saleId);
     return res.status(200).json(formatSaleRow(updated));
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
+      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+    }
     console.error('Erro ao atualizar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel atualizar a venda.' });
   }

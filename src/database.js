@@ -176,6 +176,47 @@ if (client === 'mysql') {
     return adapter;
   };
 
+  const sanitizeMysqlOrderNumbers = async (db) => {
+    await db.run('UPDATE sales SET order_number = TRIM(order_number) WHERE order_number IS NOT NULL;');
+    await db.run("UPDATE sales SET order_number = NULL WHERE order_number IS NOT NULL AND order_number = '';");
+
+    const duplicates = await db.all(
+      `SELECT order_number FROM sales WHERE order_number IS NOT NULL GROUP BY order_number HAVING COUNT(*) > 1`
+    );
+
+    if (!Array.isArray(duplicates) || duplicates.length === 0) {
+      return;
+    }
+
+    await db.transaction(async (trx) => {
+      for (const row of duplicates) {
+        const orderNumber = row?.order_number;
+        if (!orderNumber) {
+          continue;
+        }
+
+        const rows = await trx.all(
+          'SELECT id FROM sales WHERE order_number = ? ORDER BY id ASC',
+          [orderNumber]
+        );
+
+        if (!Array.isArray(rows) || rows.length < 2) {
+          continue;
+        }
+
+        const [, ...rest] = rows;
+        for (const duplicate of rest) {
+          const duplicateId = duplicate?.id;
+          if (duplicateId == null) {
+            continue;
+          }
+
+          await trx.run('UPDATE sales SET order_number = NULL WHERE id = ?', [duplicateId]);
+        }
+      }
+    });
+  };
+
   const ensureMysqlSchema = async (db) => {
     await db.exec(`
       CREATE TABLE IF NOT EXISTS users (
@@ -218,6 +259,7 @@ if (client === 'mysql') {
       CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
         influencer_id INT NOT NULL,
+        order_number VARCHAR(100),
         date DATE NOT NULL,
         gross_value DECIMAL(12,2) NOT NULL CHECK (gross_value >= 0),
         discount DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
@@ -226,7 +268,8 @@ if (client === 'mysql') {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_sales_influencer FOREIGN KEY (influencer_id)
           REFERENCES influenciadoras(id) ON DELETE CASCADE,
-        INDEX idx_sales_influencer (influencer_id)
+        INDEX idx_sales_influencer (influencer_id),
+        UNIQUE KEY uniq_sales_order_number (order_number)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
@@ -243,6 +286,27 @@ if (client === 'mysql') {
         INDEX idx_password_resets_user (user_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    const salesColumns = await db.all(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+      [config.database, 'sales']
+    );
+    const hasOrderNumberColumn = Array.isArray(salesColumns)
+      ? salesColumns.some((column) => column.COLUMN_NAME === 'order_number')
+      : false;
+    if (!hasOrderNumberColumn) {
+      await db.exec('ALTER TABLE sales ADD COLUMN order_number VARCHAR(100);');
+    }
+
+    const uniqueIndexRows = await db.all(
+      `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'order_number' AND NON_UNIQUE = 0`,
+      [config.database, 'sales']
+    );
+    const hasUniqueOrderNumberIndex = Array.isArray(uniqueIndexRows) && uniqueIndexRows.length > 0;
+    if (!hasUniqueOrderNumberIndex) {
+      await sanitizeMysqlOrderNumbers(db);
+      await db.exec('CREATE UNIQUE INDEX uniq_sales_order_number ON sales (order_number);');
+    }
   };
 
   const config = getMysqlConfig();
@@ -470,6 +534,7 @@ if (client === 'mysql') {
     CREATE TABLE ${tableName} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       influencer_id INTEGER NOT NULL,
+      order_number TEXT,
       date TEXT NOT NULL,
       gross_value REAL NOT NULL CHECK (gross_value >= 0),
       discount REAL NOT NULL DEFAULT 0 CHECK (discount >= 0),
@@ -480,11 +545,63 @@ if (client === 'mysql') {
     );
   `;
 
+  const sanitizeSqliteOrderNumbers = () => {
+    db.exec('UPDATE sales SET order_number = TRIM(order_number) WHERE order_number IS NOT NULL;');
+    db.exec("UPDATE sales SET order_number = NULL WHERE order_number IS NOT NULL AND order_number = '';");
+
+    const duplicates = db
+      .prepare(`SELECT order_number FROM sales WHERE order_number IS NOT NULL GROUP BY order_number HAVING COUNT(*) > 1;`)
+      .all();
+
+    if (!duplicates.length) {
+      return;
+    }
+
+    const selectIds = db.prepare('SELECT id FROM sales WHERE order_number = ? ORDER BY id;');
+    const clearOrderNumber = db.prepare('UPDATE sales SET order_number = NULL WHERE id = ?;');
+
+    db.exec('BEGIN');
+    try {
+      for (const row of duplicates) {
+        const orderNumber = row?.order_number;
+        if (!orderNumber) {
+          continue;
+        }
+
+        const rows = selectIds.all(orderNumber);
+        if (!rows.length) {
+          continue;
+        }
+
+        for (let index = 1; index < rows.length; index += 1) {
+          const duplicateId = rows[index]?.id;
+          if (duplicateId == null) {
+            continue;
+          }
+          clearOrderNumber.run(duplicateId);
+        }
+      }
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  };
+
   const ensureSalesTable = () => {
-    const tableInfo = db.prepare('PRAGMA table_info(sales)').all();
+    let tableInfo = db.prepare('PRAGMA table_info(sales)').all();
     if (!tableInfo.length) {
       db.exec(createSalesTable());
+      tableInfo = db.prepare('PRAGMA table_info(sales)').all();
     }
+
+    const hasOrderNumber = tableInfo.some((column) => column.name === 'order_number');
+    if (!hasOrderNumber) {
+      db.exec('ALTER TABLE sales ADD COLUMN order_number TEXT;');
+    }
+
+    sanitizeSqliteOrderNumbers();
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_sales_order_number ON sales(order_number);');
   };
 
   const ensurePasswordResetsTable = () => {
