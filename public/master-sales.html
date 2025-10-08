@@ -16,6 +16,64 @@
       </header>
 
       <section class="card">
+        <h2>Importar vendas por período</h2>
+        <p class="note">
+          Cole os dados exportados da plataforma (como a tabela de pedidos) ou, se preferir, faça o upload do arquivo JSON. Informe
+          a data de referência apenas quando o relatório não trouxer a data da venda. Após importar, você continua podendo editar
+          cada registro individualmente.
+        </p>
+        <form id="importSalesForm">
+          <div class="form-grid compact">
+            <label>
+              Data de referência
+              <input id="importReferenceDate" name="referenceDate" type="date" />
+              <span class="help-text">Usada quando os dados colados não tiverem data.</span>
+            </label>
+            <label class="full-width">
+              Cole as vendas aqui*
+              <textarea
+                id="importSalesText"
+                name="salesText"
+                rows="8"
+                placeholder="Ex.: Número do pedido, data do pagamento, valor, cupom"
+              ></textarea>
+            </label>
+            <label>
+              Arquivo JSON
+              <input id="importSalesFile" name="salesFile" type="file" accept="application/json" />
+            </label>
+          </div>
+          <p class="note">
+            Dica: copie a tabela com as colunas Pedido, Data (Paid at), Valor (Subtotal) e Cupom (Discount Code). Quando o cupom
+            não estiver cadastrado, a linha aparecerá com alerta.
+          </p>
+          <div class="button-row">
+            <button type="submit">Importar vendas</button>
+            <button type="button" class="secondary-button" id="clearImportButton">Limpar</button>
+          </div>
+        </form>
+        <div id="importSalesMessage" class="message" aria-live="polite"></div>
+        <div id="importSummary" class="summary hidden" aria-live="polite"></div>
+        <div id="importPreview" class="table-wrapper hidden" aria-live="polite">
+          <table id="importPreviewTable">
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Data</th>
+                <th>Cupom</th>
+                <th>Influenciadora</th>
+                <th>Bruto</th>
+                <th>Desconto</th>
+                <th>Liquido</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
         <div class="link-grid" style="margin-bottom:16px;">
           <a class="link-card" href="master-create.html">Cadastrar</a>
           <a class="link-card" href="master-consult.html">Consulta</a>
