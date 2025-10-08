@@ -999,13 +999,491 @@
     const reloadSalesButton = document.getElementById('reloadSalesButton');
     const salesTableBody = document.querySelector('#salesTable tbody');
     const salesSummaryEl = document.getElementById('salesSummary');
+    const importSalesForm = document.getElementById('importSalesForm');
+    const importReferenceDateInput = document.getElementById('importReferenceDate');
+    const importSalesFileInput = document.getElementById('importSalesFile');
+    const importMessageEl = document.getElementById('importSalesMessage');
+    const clearImportButton = document.getElementById('clearImportButton');
+    const importPreviewWrapper = document.getElementById('importPreview');
+    const importPreviewTableBody = document.querySelector('#importPreviewTable tbody');
+    const importSummaryEl = document.getElementById('importSummary');
 
     addRealtimeValidation(form);
+    addRealtimeValidation(importSalesForm);
 
     let influencers = [];
     let sales = [];
     let currentSalesInfluencerId = null;
     let saleEditingId = null;
+
+    const showElement = (element) => {
+      element?.classList?.remove('hidden');
+    };
+
+    const hideElement = (element) => {
+      element?.classList?.add('hidden');
+    };
+
+    const readFileAsText = (file) => {
+      if (!file) return Promise.resolve('');
+      if (typeof file.text === 'function') {
+        return file.text();
+      }
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result || '');
+        reader.onerror = () => reject(reader.error || new Error('Falha ao ler o arquivo.'));
+        reader.readAsText(file);
+      });
+    };
+
+    const getNestedValue = (object, path) => {
+      if (!object || typeof object !== 'object') return undefined;
+      const parts = String(path)
+        .split('.')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (!parts.length) return undefined;
+      let value = object;
+      for (const part of parts) {
+        if (value && typeof value === 'object' && part in value) {
+          value = value[part];
+        } else {
+          return undefined;
+        }
+      }
+      return value;
+    };
+
+    const findValueByKeys = (object, keys = []) => {
+      if (!object || typeof object !== 'object') return undefined;
+      for (const key of keys) {
+        if (!key) continue;
+        const value = key.includes('.') ? getNestedValue(object, key) : object[key];
+        if (value !== undefined && value !== null) {
+          return value;
+        }
+      }
+      return undefined;
+    };
+
+    const parseNumeric = (value) => {
+      if (value == null || value === '') return null;
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+      }
+      if (typeof value === 'boolean') {
+        return value ? 1 : 0;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        let sanitized = trimmed.replace(/[^0-9.,-]/g, '');
+        if (!sanitized) return null;
+        const lastComma = sanitized.lastIndexOf(',');
+        const lastDot = sanitized.lastIndexOf('.');
+        if (lastComma > lastDot) {
+          sanitized = sanitized.replace(/\./g, '').replace(',', '.');
+        } else if (lastDot > lastComma) {
+          sanitized = sanitized.replace(/,/g, '');
+        } else {
+          sanitized = sanitized.replace(/,/g, '.');
+        }
+        const number = Number(sanitized);
+        return Number.isFinite(number) ? number : null;
+      }
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
+
+    const parseInteger = (value) => {
+      const number = parseNumeric(value);
+      if (!Number.isFinite(number)) return null;
+      return Math.round(number);
+    };
+
+    const extractArrayFromData = (data) => {
+      if (Array.isArray(data)) return data;
+      if (!data || typeof data !== 'object') return [];
+      const possibleKeys = [
+        'sales',
+        'vendas',
+        'data',
+        'items',
+        'pedidos',
+        'coupons',
+        'relatorio',
+        'relatorio_detalhado',
+        'report',
+        'reports',
+        'resultado',
+        'result',
+        'entries',
+        'rows',
+        'values',
+        'lista'
+      ];
+      for (const key of possibleKeys) {
+        const value = data[key];
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+          const nested = extractArrayFromData(value);
+          if (nested.length) return nested;
+        }
+      }
+      for (const value of Object.values(data)) {
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+          const nested = extractArrayFromData(value);
+          if (nested.length) return nested;
+        }
+      }
+      return [];
+    };
+
+    const normalizeImportEntries = (entries = []) => {
+      if (!Array.isArray(entries)) return [];
+      const couponKeys = ['cupom', 'coupon', 'discount_code', 'discountCode', 'code', 'coupon_code', 'couponCode', 'name'];
+      const grossKeys = [
+        'grossSales',
+        'gross_sales',
+        'gross_value',
+        'valor_bruto',
+        'valorBruto',
+        'vendas_brutas',
+        'sales_gross',
+        'amount.gross',
+        'gross'
+      ];
+      const discountKeys = [
+        'discount',
+        'discount_total',
+        'discountAmount',
+        'discount_amount',
+        'valor_desconto',
+        'desconto',
+        'descontos',
+        'amount.discount'
+      ];
+      const netKeys = [
+        'netSales',
+        'net_sales',
+        'net_value',
+        'valor_liquido',
+        'valorLiquido',
+        'vendas_liquidas',
+        'amount.net',
+        'net'
+      ];
+      const ordersKeys = ['orders', 'orders_with_discount', 'ordersWithDiscount', 'pedidos', 'total_orders', 'ordersApplied'];
+
+      return entries.map((entry, index) => {
+        const couponValue = findValueByKeys(entry, couponKeys);
+        const coupon = couponValue != null ? String(couponValue).trim() : '';
+        const influencer = getInfluencerByCoupon(coupon);
+
+        let grossValue = parseNumeric(findValueByKeys(entry, grossKeys));
+        let discount = parseNumeric(findValueByKeys(entry, discountKeys));
+        let netValue = parseNumeric(findValueByKeys(entry, netKeys));
+        const orders = parseInteger(findValueByKeys(entry, ordersKeys));
+
+        if (!Number.isFinite(grossValue) && Number.isFinite(netValue) && Number.isFinite(discount)) {
+          grossValue = netValue + discount;
+        }
+
+        if (!Number.isFinite(netValue) && Number.isFinite(grossValue) && Number.isFinite(discount)) {
+          netValue = grossValue - discount;
+        }
+
+        if (!Number.isFinite(discount) && Number.isFinite(grossValue) && Number.isFinite(netValue)) {
+          discount = Math.max(0, grossValue - netValue);
+        }
+
+        if (!Number.isFinite(grossValue) && Number.isFinite(netValue)) {
+          grossValue = netValue + Math.max(0, discount || 0);
+        }
+
+        if (!Number.isFinite(netValue) && Number.isFinite(grossValue)) {
+          netValue = grossValue - Math.max(0, discount || 0);
+        }
+
+        grossValue = Number.isFinite(grossValue) ? Math.max(0, grossValue) : null;
+        discount = Number.isFinite(discount) ? Math.max(0, discount) : 0;
+        netValue = Number.isFinite(netValue) ? Math.max(0, netValue) : null;
+
+        if (grossValue == null && netValue != null) {
+          grossValue = netValue + discount;
+        }
+
+        if (netValue == null && grossValue != null) {
+          netValue = Math.max(0, grossValue - discount);
+        }
+
+        if (!Number.isFinite(netValue)) netValue = null;
+        if (!Number.isFinite(grossValue)) grossValue = null;
+
+        const result = {
+          index: index + 1,
+          entry,
+          cupom: coupon,
+          influencerId: influencer?.id || null,
+          influencerName: influencer?.nome || '',
+          grossValue,
+          discount,
+          netValue,
+          orders: Number.isFinite(orders) ? Math.max(0, orders) : null,
+          canImport: Boolean(influencer && coupon && grossValue != null),
+          status: 'ready',
+          statusMessage: 'Pronto para importação'
+        };
+
+        if (!coupon) {
+          result.status = 'error';
+          result.statusMessage = 'Cupom ausente no arquivo.';
+          result.canImport = false;
+        } else if (!influencer) {
+          result.status = 'warning';
+          result.statusMessage = 'Cupom não cadastrado no sistema.';
+          result.canImport = false;
+        } else if (grossValue == null) {
+          result.status = 'error';
+          result.statusMessage = 'Valor bruto não encontrado para o cupom.';
+          result.canImport = false;
+        } else if (netValue == null) {
+          result.status = 'error';
+          result.statusMessage = 'Valor líquido não pôde ser calculado.';
+          result.canImport = false;
+        }
+
+        return result;
+      });
+    };
+
+    const renderImportPreview = (rows = []) => {
+      if (!importPreviewTableBody) return;
+      importPreviewTableBody.innerHTML = '';
+      if (!rows.length) {
+        hideElement(importPreviewWrapper);
+        hideElement(importSummaryEl);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      rows.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.dataset.status = row.status || 'ready';
+        const columns = [
+          row.cupom || '-',
+          row.influencerName || '-',
+          row.orders != null ? String(row.orders) : '-',
+          row.grossValue != null ? formatCurrency(row.grossValue) : '-',
+          formatCurrency(row.discount || 0),
+          row.netValue != null ? formatCurrency(row.netValue) : '-',
+          row.statusMessage || '-'
+        ];
+        columns.forEach((value, columnIndex) => {
+          const td = document.createElement('td');
+          if (columnIndex === columns.length - 1) {
+            const badge = document.createElement('span');
+            badge.className = 'status-badge';
+            badge.dataset.status = row.status || 'ready';
+            badge.textContent = value;
+            td.appendChild(badge);
+          } else {
+            td.textContent = value;
+          }
+          tr.appendChild(td);
+        });
+        fragment.appendChild(tr);
+      });
+
+      importPreviewTableBody.appendChild(fragment);
+      showElement(importPreviewWrapper);
+
+      if (importSummaryEl) {
+        const total = rows.length;
+        const successCount = rows.filter((row) => row.status === 'success').length;
+        const readyCount = rows.filter((row) => row.status === 'ready').length;
+        const warningCount = rows.filter((row) => row.status === 'warning' || row.status === 'skipped').length;
+        const errorCount = rows.filter((row) => row.status === 'error' || row.status === 'failed').length;
+
+        importSummaryEl.innerHTML = '';
+        const summaryItems = [
+          { count: total, label: 'itens processados', status: 'info' },
+          { count: successCount, label: 'importados', status: 'success' },
+          { count: readyCount, label: 'prontos para importar', status: 'ready' },
+          { count: warningCount, label: 'com alerta', status: 'warning' },
+          { count: errorCount, label: 'com erro', status: 'error' }
+        ].filter((item) => item.count > 0);
+
+        summaryItems.forEach((item) => {
+          const span = document.createElement('span');
+          span.dataset.status = item.status;
+          span.innerHTML = `<strong>${item.count}</strong> ${item.label}`;
+          importSummaryEl.appendChild(span);
+        });
+
+        if (summaryItems.length) {
+          showElement(importSummaryEl);
+        } else {
+          hideElement(importSummaryEl);
+        }
+      }
+    };
+
+    const clearImportState = () => {
+      importSalesForm?.reset();
+      importSalesForm?.querySelectorAll('[aria-invalid="true"]').forEach((field) => field.removeAttribute('aria-invalid'));
+      setMessage(importMessageEl, '', '');
+      hideElement(importSummaryEl);
+      hideElement(importPreviewWrapper);
+      if (importSalesFileInput) importSalesFileInput.value = '';
+      if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';
+    };
+
+    const setFormBusy = (formEl, busy) => {
+      if (!formEl) return;
+      const elements = Array.from(formEl.elements || []);
+      elements.forEach((element) => {
+        if (busy) {
+          element.dataset.prevDisabled = element.disabled ? 'true' : 'false';
+          element.disabled = true;
+        } else {
+          if (element.dataset.prevDisabled !== 'true') {
+            element.disabled = false;
+          }
+          delete element.dataset.prevDisabled;
+        }
+      });
+    };
+
+    clearImportButton?.addEventListener('click', (event) => {
+      event.preventDefault();
+      clearImportState();
+    });
+
+    importSalesForm?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const referenceDate = importReferenceDateInput?.value || '';
+      const file = importSalesFileInput?.files?.[0] || null;
+
+      flagInvalidField(importReferenceDateInput, Boolean(referenceDate));
+      flagInvalidField(importSalesFileInput, Boolean(file));
+
+      if (!referenceDate || !file) {
+        setMessage(importMessageEl, 'Informe a data e selecione o arquivo JSON para importar.', 'error');
+        return;
+      }
+
+      if (!influencers.length) {
+        setMessage(importMessageEl, 'Carregando influenciadoras cadastradas. Aguarde um instante e tente novamente.', 'info');
+        await loadInfluencersForSales();
+        if (!influencers.length) {
+          setMessage(importMessageEl, 'Cadastre influenciadoras com cupom antes de importar as vendas.', 'error');
+          return;
+        }
+      }
+
+      setFormBusy(importSalesForm, true);
+      setMessage(importMessageEl, 'Lendo arquivo e preparando as vendas...', 'info');
+
+      try {
+        const fileContent = await readFileAsText(file);
+        let parsed;
+        try {
+          parsed = JSON.parse(fileContent);
+        } catch (parseError) {
+          throw new Error('O arquivo selecionado não contém um JSON válido.');
+        }
+
+        const rawEntries = extractArrayFromData(parsed);
+        if (!rawEntries.length) {
+          throw new Error('Nenhuma venda foi encontrada no arquivo informado.');
+        }
+
+        const normalizedEntries = normalizeImportEntries(rawEntries);
+        normalizedEntries
+          .filter((item) => item.status === 'warning' && !item.canImport)
+          .forEach((item) => {
+            item.status = 'skipped';
+            item.statusMessage = 'Cupom não cadastrado. Cadastre-o e tente novamente.';
+          });
+
+        renderImportPreview(normalizedEntries);
+
+        const importableEntries = normalizedEntries.filter((item) => item.canImport);
+
+        if (!importableEntries.length) {
+          setMessage(
+            importMessageEl,
+            'Nenhuma venda está pronta para importação. Revise os avisos destacados na tabela.',
+            'error'
+          );
+          return;
+        }
+
+        setMessage(importMessageEl, 'Enviando vendas para o sistema...', 'info');
+
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const item of importableEntries) {
+          try {
+            await apiFetch('/sales', {
+              method: 'POST',
+              body: {
+                cupom: item.cupom,
+                date: referenceDate,
+                grossValue: item.grossValue,
+                discount: item.discount || 0
+              }
+            });
+            item.status = 'success';
+            item.statusMessage = 'Importada com sucesso.';
+            successCount += 1;
+          } catch (error) {
+            if (error.status === 401) {
+              logout();
+              return;
+            }
+            item.status = 'failed';
+            item.statusMessage = error.message || 'Erro ao importar venda.';
+            failureCount += 1;
+          }
+        }
+
+        renderImportPreview(normalizedEntries);
+
+        if (importSalesFileInput) {
+          importSalesFileInput.value = '';
+        }
+
+        if (successCount && !failureCount) {
+          setMessage(importMessageEl, `Importação concluída com ${successCount} vendas.`, 'success');
+        } else if (successCount && failureCount) {
+          setMessage(
+            importMessageEl,
+            `Importação finalizada com alertas: ${successCount} vendas criadas e ${failureCount} falharam.`,
+            'info'
+          );
+        } else {
+          setMessage(importMessageEl, 'Nenhuma venda foi importada. Verifique o arquivo e tente novamente.', 'error');
+        }
+
+        if (successCount && currentSalesInfluencerId) {
+          await loadSalesForInfluencer(currentSalesInfluencerId, { showStatus: false });
+          setMessage(messageEl, 'Vendas atualizadas após importação.', 'success');
+        }
+      } catch (error) {
+        setMessage(importMessageEl, error.message || 'Não foi possível processar o arquivo informado.', 'error');
+        hideElement(importSummaryEl);
+        hideElement(importPreviewWrapper);
+        if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';
+      } finally {
+        setFormBusy(importSalesForm, false);
+      }
+    });
 
     const getInfluencerByCoupon = (coupon) => {
       if (!coupon) return undefined;
