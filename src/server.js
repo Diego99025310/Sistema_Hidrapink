@@ -149,6 +149,7 @@ const findInfluencerByCouponStmt = db.prepare(`${influencerBaseQuery} WHERE i.cu
 const insertSaleStmt = db.prepare(`
   INSERT INTO sales (
     influencer_id,
+    order_number,
     date,
     gross_value,
     discount,
@@ -156,6 +157,7 @@ const insertSaleStmt = db.prepare(`
     commission
   ) VALUES (
     @influencer_id,
+    @order_number,
     @date,
     @gross_value,
     @discount,
@@ -167,6 +169,7 @@ const insertSaleStmt = db.prepare(`
 const updateSaleStmt = db.prepare(`
   UPDATE sales SET
     influencer_id = @influencer_id,
+    order_number = @order_number,
     date = @date,
     gross_value = @gross_value,
     discount = @discount,
@@ -176,9 +179,11 @@ const updateSaleStmt = db.prepare(`
 `);
 
 const deleteSaleStmt = db.prepare('DELETE FROM sales WHERE id = ?');
+const findSaleByOrderNumberStmt = db.prepare('SELECT id FROM sales WHERE order_number = ?');
 const findSaleByIdStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -195,6 +200,7 @@ const findSaleByIdStmt = db.prepare(`
 const listSalesByInfluencerStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -422,19 +428,334 @@ const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
   return { netValue, commissionValue };
 };
 
-const formatSaleRow = (row) => ({
-  id: row.id,
-  influencer_id: row.influencer_id,
-  cupom: row.cupom || null,
-  nome: row.nome || null,
-  date: row.date,
-  gross_value: Number(row.gross_value),
-  discount: Number(row.discount),
-  net_value: Number(row.net_value),
-  commission: Number(row.commission),
-  commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
-  created_at: row.created_at
+const normalizeOrderNumber = (value) => {
+  if (value == null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+};
+
+const stripBom = (value) => {
+  if (!value) return '';
+  return value.replace(/^[\uFEFF\u200B]+/, '');
+};
+
+const normalizeImportHeader = (header) =>
+  stripBom(String(header || '')).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+
+const detectImportDelimiter = (line) => {
+  const tab = '\t';
+  if (line.includes(tab)) return tab;
+  if (line.includes(';')) return ';';
+  if (line.includes(',')) return ',';
+  return null;
+};
+
+const parseImportDecimal = (value) => {
+  if (value == null) return { value: 0 };
+  const trimmed = stripBom(String(value)).trim();
+  if (!trimmed) return { value: 0 };
+  let normalized = trimmed.replace(/\s+/g, '');
+  if (normalized.includes('.') && normalized.includes(',')) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  } else if (normalized.includes(',')) {
+    normalized = normalized.replace(',', '.');
+  }
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    return { error: 'Valor numerico invalido.' };
+  }
+  return { value: roundCurrency(parsed) };
+};
+
+const parseImportDate = (value) => {
+  if (!value) {
+    return { error: 'Informe a data da venda.' };
+  }
+  const trimmed = stripBom(String(value)).trim();
+  if (!trimmed) {
+    return { error: 'Informe a data da venda.' };
+  }
+  const match = trimmed.match(
+    /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/
+  );
+  if (!match) {
+    return { error: 'Data invalida. Use o formato DD/MM/AAAA.' };
+  }
+  let [day, month, year] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (year < 100) {
+    year += 2000;
+  }
+  if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900) {
+    return { error: 'Data invalida. Use o formato DD/MM/AAAA.' };
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return { error: 'Data invalida. Use o formato DD/MM/AAAA.' };
+  }
+  const iso = `${year.toString().padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { value: iso };
+};
+
+const analyzeSalesImport = (rawText) => {
+  const text = stripBom(trimString(rawText || ''));
+  if (!text) {
+    return { error: 'Cole os dados das vendas para realizar a importacao.' };
+  }
+
+  const lines = text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) =>
+      stripBom(line)
+        .replace(/[\u0000-\u0008\u000A-\u001F]+/g, '')
+        .trimEnd()
+    );
+
+  const columnAliases = {
+    orderNumber: ['pedido', 'numero', 'ordem', 'ordernumber', 'numeropedido'],
+    cupom: ['cupom', 'coupon'],
+    date: ['data', 'date'],
+    grossValue: ['valorbruto', 'bruto', 'gross', 'valor'],
+    discount: ['desconto', 'discount']
+  };
+
+  const columnIndexes = { orderNumber: 0, cupom: 1, date: 2, grossValue: 3, discount: 4 };
+  let delimiter = null;
+  let dataStarted = false;
+  let lineNumber = 0;
+
+  const rows = [];
+
+  for (const originalLine of lines) {
+    lineNumber += 1;
+    const line = originalLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (!dataStarted) {
+      delimiter = detectImportDelimiter(line) || delimiter;
+      const tokens = delimiter ? line.split(delimiter) : line.split(/\s{2,}|\s/);
+      const normalizedTokens = tokens.map((token) => normalizeImportHeader(token));
+      const hasHeaderKeywords = normalizedTokens.some((token) => token.includes('pedido'));
+      if (hasHeaderKeywords) {
+        normalizedTokens.forEach((token, index) => {
+          for (const [key, aliases] of Object.entries(columnAliases)) {
+            if (aliases.includes(token)) {
+              columnIndexes[key] = index;
+              break;
+            }
+          }
+        });
+        dataStarted = true;
+        continue;
+      }
+      dataStarted = true;
+    }
+
+    delimiter = detectImportDelimiter(line) || delimiter;
+    const cells = delimiter ? line.split(delimiter) : line.split(/\s{2,}|\s/);
+
+    const getCell = (column) => {
+      const index = columnIndexes[column];
+      if (index == null || index >= cells.length) return '';
+      return stripBom(cells[index]).trim();
+    };
+
+    const orderCell = getCell('orderNumber');
+    const cupomCell = getCell('cupom');
+    const dateCell = getCell('date');
+    const grossCell = getCell('grossValue');
+    const discountCell = getCell('discount');
+
+    const row = {
+      line: lineNumber,
+      orderNumber: orderCell,
+      cupom: cupomCell,
+      rawDate: dateCell,
+      rawGross: grossCell,
+      rawDiscount: discountCell,
+      errors: []
+    };
+
+    const { value: isoDate, error: dateError } = parseImportDate(dateCell);
+    if (dateError) {
+      row.errors.push(dateError);
+    }
+
+    const grossParsed = parseImportDecimal(grossCell);
+    if (grossParsed.error) {
+      row.errors.push('Valor bruto invalido.');
+    }
+
+    const discountParsed = parseImportDecimal(discountCell);
+    if (discountParsed.error) {
+      row.errors.push('Desconto invalido.');
+    }
+
+    const normalizedPayload = {
+      orderNumber: orderCell,
+      cupom: cupomCell,
+      date: isoDate,
+      grossValue: grossParsed.value,
+      discount: discountParsed.value
+    };
+
+    if (!row.errors.length) {
+      const { data, error } = normalizeSaleBody({
+        orderNumber: normalizedPayload.orderNumber,
+        cupom: normalizedPayload.cupom,
+        date: normalizedPayload.date,
+        grossValue: normalizedPayload.grossValue,
+        discount: normalizedPayload.discount
+      });
+      if (error) {
+        row.errors.push(error.error || 'Linha invalida.');
+      } else {
+        row.normalized = data;
+      }
+    }
+
+    rows.push(row);
+  }
+
+  if (!rows.length) {
+    return { error: 'Nenhuma venda encontrada nos dados informados.' };
+  }
+
+  const orderOccurrences = new Map();
+  rows.forEach((row) => {
+    const order = normalizeOrderNumber(row.normalized?.orderNumber ?? row.orderNumber);
+    if (!order) return;
+    if (!orderOccurrences.has(order)) {
+      orderOccurrences.set(order, []);
+    }
+    orderOccurrences.get(order).push(row);
+  });
+
+  const results = rows.map((row) => {
+    if (!row.normalized) {
+      return {
+        line: row.line,
+        orderNumber: normalizeOrderNumber(row.orderNumber),
+        cupom: trimString(row.cupom) || '',
+        date: null,
+        grossValue: null,
+        discount: null,
+        netValue: null,
+        commission: null,
+        influencerId: null,
+        influencerName: null,
+        commissionRate: null,
+        errors: row.errors,
+        rawDate: row.rawDate,
+        rawGross: row.rawGross,
+        rawDiscount: row.rawDiscount
+      };
+    }
+
+    const normalizedOrder = normalizeOrderNumber(row.normalized.orderNumber);
+    const influencer = findInfluencerByCouponStmt.get(row.normalized.cupom);
+    if (!influencer) {
+      row.errors.push('Cupom nao cadastrado.');
+    }
+
+    const duplicateRows = orderOccurrences.get(normalizedOrder) || [];
+    if (duplicateRows.length > 1) {
+      row.errors.push('Numero de pedido repetido nos dados importados.');
+    }
+
+    const existingSale = normalizedOrder ? findSaleByOrderNumberStmt.get(normalizedOrder) : null;
+    if (existingSale) {
+      row.errors.push('Numero de pedido ja cadastrado.');
+    }
+
+    const commissionRate = influencer?.commission_rate != null ? Number(influencer.commission_rate) : 0;
+    const totals = computeSaleTotals(row.normalized.grossValue, row.normalized.discount, commissionRate);
+
+    return {
+      line: row.line,
+      orderNumber: normalizedOrder,
+      cupom: row.normalized.cupom,
+      date: row.normalized.date,
+      grossValue: row.normalized.grossValue,
+      discount: row.normalized.discount,
+      netValue: totals.netValue,
+      commission: totals.commissionValue,
+      influencerId: influencer?.id ?? null,
+      influencerName: influencer?.nome ?? null,
+      commissionRate,
+      errors: row.errors,
+      rawDate: row.rawDate,
+      rawGross: row.rawGross,
+      rawDiscount: row.rawDiscount
+    };
+  });
+
+  const validRows = results.filter((row) => !row.errors.length);
+  const summary = {
+    count: validRows.length,
+    totalGross: roundCurrency(validRows.reduce((sum, row) => sum + row.grossValue, 0)),
+    totalDiscount: roundCurrency(validRows.reduce((sum, row) => sum + row.discount, 0)),
+    totalNet: roundCurrency(validRows.reduce((sum, row) => sum + row.netValue, 0)),
+    totalCommission: roundCurrency(validRows.reduce((sum, row) => sum + row.commission, 0))
+  };
+
+  return {
+    rows: results,
+    summary,
+    totalCount: results.length,
+    validCount: validRows.length,
+    errorCount: results.length - validRows.length,
+    hasErrors: results.some((row) => row.errors.length > 0)
+  };
+};
+
+const insertImportedSales = db.transaction((rows) => {
+  const created = [];
+  rows.forEach((row) => {
+    const result = insertSaleStmt.run({
+      influencer_id: row.influencerId,
+      order_number: row.orderNumber,
+      date: row.date,
+      gross_value: row.grossValue,
+      discount: row.discount,
+      net_value: row.netValue,
+      commission: row.commission
+    });
+    const sale = findSaleByIdStmt.get(result.lastInsertRowid);
+    created.push(formatSaleRow(sale));
+  });
+  return created;
 });
+
+const formatSaleRow = (row) => {
+  const orderNumber = normalizeOrderNumber(
+    row?.order_number ?? row?.orderNumber ?? row?.pedido ?? null
+  );
+
+  return {
+    id: row.id,
+    influencer_id: row.influencer_id,
+    order_number: orderNumber,
+    orderNumber,
+    cupom: row.cupom || null,
+    nome: row.nome || null,
+    date: row.date,
+    gross_value: Number(row.gross_value),
+    discount: Number(row.discount),
+    net_value: Number(row.net_value),
+    commission: Number(row.commission),
+    commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
+    created_at: row.created_at
+  };
+};
 
 const createInfluencerTransaction = db.transaction((influencerPayload, userPayload) => {
   const mustChange = userPayload.mustChange ?? 0;
@@ -469,11 +790,19 @@ const ensureInfluencerAccess = (req, influencerId) => {
 };
 
 const normalizeSaleBody = (body) => {
+  const orderNumberRaw = body?.orderNumber ?? body?.order_number ?? body?.pedido ?? body?.order;
+  const orderNumber = orderNumberRaw == null ? '' : String(trimString(orderNumberRaw)).trim();
   const cupom = trimString(body?.cupom);
   const date = trimString(body?.date);
   const grossRaw = body?.grossValue ?? body?.gross_value;
   const discountRaw = body?.discount ?? body?.discountValue ?? body?.discount_value ?? 0;
 
+  if (!orderNumber) {
+    return { error: { error: 'Informe o numero do pedido.' } };
+  }
+  if (orderNumber.length > 100) {
+    return { error: { error: 'Numero do pedido deve ter no maximo 100 caracteres.' } };
+  }
   if (!cupom) {
     return { error: { error: 'Informe o cupom da influenciadora.' } };
   }
@@ -497,6 +826,7 @@ const normalizeSaleBody = (body) => {
 
   return {
     data: {
+      orderNumber,
       cupom,
       date,
       grossValue: grossParsed.value,
@@ -681,6 +1011,46 @@ app.delete('/influenciadora/:id', authenticate, authorizeMaster, (req, res) => {
   }
 });
 
+app.post('/sales/import/preview', authenticate, authorizeMaster, (req, res) => {
+  const text = req.body?.text ?? req.body?.data ?? '';
+  const analysis = analyzeSalesImport(text);
+  if (analysis.error) {
+    return res.status(400).json({ error: analysis.error });
+  }
+  return res.status(200).json(analysis);
+});
+
+app.post('/sales/import/confirm', authenticate, authorizeMaster, (req, res) => {
+  const text = req.body?.text ?? req.body?.data ?? '';
+  const analysis = analyzeSalesImport(text);
+  if (analysis.error) {
+    return res.status(400).json({ error: analysis.error });
+  }
+  if (!analysis.totalCount) {
+    return res.status(400).json({ error: 'Nenhuma venda valida para importar.' });
+  }
+  if (analysis.hasErrors || analysis.validCount !== analysis.totalCount) {
+    return res
+      .status(409)
+      .json({ error: 'Nao foi possivel importar. Corrija os erros identificados e tente novamente.', analysis });
+  }
+
+  try {
+    const created = insertImportedSales(analysis.rows);
+    return res.status(201).json({
+      inserted: created.length,
+      rows: created,
+      summary: analysis.summary
+    });
+  } catch (error) {
+    if (error && (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.code === 'ER_DUP_ENTRY')) {
+      return res.status(409).json({ error: 'Numero de pedido ja cadastrado.' });
+    }
+    console.error('Erro ao importar vendas:', error);
+    return res.status(500).json({ error: 'Nao foi possivel concluir a importacao.' });
+  }
+});
+
 app.post('/sales', authenticate, authorizeMaster, (req, res) => {
   const { data, error } = normalizeSaleBody(req.body || {});
   if (error) {
@@ -692,11 +1062,17 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
+  const existingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
+  if (existingSale) {
+    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+  }
+
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
     const result = insertSaleStmt.run({
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
@@ -706,6 +1082,9 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     const created = findSaleByIdStmt.get(result.lastInsertRowid);
     return res.status(201).json(formatSaleRow(created));
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
+      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+    }
     console.error('Erro ao cadastrar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a venda.' });
   }
@@ -732,12 +1111,18 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
+  const conflictingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
+  if (conflictingSale && conflictingSale.id !== saleId) {
+    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+  }
+
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
     updateSaleStmt.run({
       id: saleId,
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
@@ -748,6 +1133,9 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     const updated = findSaleByIdStmt.get(saleId);
     return res.status(200).json(formatSaleRow(updated));
   } catch (err) {
+    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
+      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
+    }
     console.error('Erro ao atualizar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel atualizar a venda.' });
   }
