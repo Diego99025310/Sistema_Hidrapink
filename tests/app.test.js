@@ -304,6 +304,117 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(Number(consultRowAfterDelete.vendas_total), 500);
 });
 
+test('importacao em massa de vendas com validacao', async () => {
+  resetDb();
+
+  const masterToken = await authenticateMaster();
+
+  const biaPayload = {
+    ...influencerPayload,
+    nome: 'Bia Influencer',
+    instagram: '@bia',
+    email: 'bia.influencer@example.com',
+    contato: '11999990000',
+    cupom: 'BIA8',
+    cpf: '39053344705',
+    loginEmail: 'bia.login@example.com',
+    loginPassword: 'SenhaBia123'
+  };
+
+  const ingridPayload = {
+    ...influencerPayload,
+    nome: 'Ingrid Influencer',
+    instagram: '@ingrid',
+    email: 'ingrid.influencer@example.com',
+    contato: '11999990001',
+    cupom: 'INGRID',
+    cpf: '15350946056',
+    loginEmail: 'ingrid.login@example.com',
+    loginPassword: 'SenhaIngrid123'
+  };
+
+  const biaResponse = await request(app)
+    .post('/influenciadora')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send(biaPayload);
+  assert.strictEqual(biaResponse.status, 201);
+
+  const ingridResponse = await request(app)
+    .post('/influenciadora')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send(ingridPayload);
+  assert.strictEqual(ingridResponse.status, 201);
+
+  const textWithUnknownCoupon = [
+    'Pedido\tCupom\tData\tValor bruto\tDesconto',
+    '#1040\tBIA8\t02/08/2025 18:08\t62.47\t',
+    '#1041\tINGRID\t02/08/2025 22:25\t62.47\t0',
+    '#1042\tNAOEXISTE\t03/08/2025 10:00\t50,00\t0'
+  ].join('\n');
+
+  const previewWithError = await request(app)
+    .post('/sales/import/preview')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ text: textWithUnknownCoupon });
+
+  assert.strictEqual(previewWithError.status, 200);
+  assert.strictEqual(previewWithError.body.hasErrors, true);
+  const unknownRow = previewWithError.body.rows.find((row) => row.cupom === 'NAOEXISTE');
+  assert.ok(unknownRow, 'Linha com cupom desconhecido deve ser retornada.');
+  assert.ok(
+    unknownRow.errors.some((message) => /cupom nao cadastrado/i.test(message)),
+    'Mensagem deve indicar cupom nao cadastrado.'
+  );
+
+  const validText = [
+    'Pedido\tCupom\tData\tValor bruto\tDesconto',
+    '#1040\tBIA8\t02/08/2025 18:08\t62.47\t',
+    '#1041\tINGRID\t02/08/2025 22:25\t62.47\t0'
+  ].join('\n');
+
+  const validPreview = await request(app)
+    .post('/sales/import/preview')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ text: validText });
+
+  assert.strictEqual(validPreview.status, 200);
+  assert.strictEqual(validPreview.body.hasErrors, false);
+  assert.strictEqual(validPreview.body.validCount, 2);
+  assert.strictEqual(Number(validPreview.body.summary.totalNet), 124.94);
+
+  const confirmImport = await request(app)
+    .post('/sales/import/confirm')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ text: validText });
+
+  assert.strictEqual(confirmImport.status, 201);
+  assert.strictEqual(confirmImport.body.inserted, 2);
+
+  const biaSales = await request(app)
+    .get(`/sales/${biaResponse.body.id}`)
+    .set('Authorization', `Bearer ${masterToken}`);
+  assert.strictEqual(biaSales.status, 200);
+  assert.strictEqual(biaSales.body.length, 1);
+
+  const duplicatePreview = await request(app)
+    .post('/sales/import/preview')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ text: validText });
+
+  assert.strictEqual(duplicatePreview.status, 200);
+  assert.strictEqual(duplicatePreview.body.hasErrors, true);
+  duplicatePreview.body.rows.forEach((row) => {
+    assert.ok(row.errors.some((message) => /pedido ja cadastrado/i.test(message)));
+  });
+
+  const duplicateConfirm = await request(app)
+    .post('/sales/import/confirm')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ text: validText });
+
+  assert.strictEqual(duplicateConfirm.status, 409);
+});
+
 after(() => {
   db.close();
   if (fs.existsSync(tempDbPath)) {

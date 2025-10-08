@@ -68,6 +68,50 @@
         </div>
         <div id="salesSummary" class="summary"></div>
       </section>
+      <section class="card" id="bulkSalesSection">
+        <h2>Importar vendas em massa</h2>
+        <p class="note">
+          Cole os dados seguindo as colunas: Pedido, Cupom, Data, Valor bruto, Desconto. Em seguida, analise os
+          resultados e confirme o salvamento quando estiver tudo certo.
+        </p>
+        <label class="stacked">
+          Dados das vendas
+          <textarea
+            id="salesImportInput"
+            rows="8"
+            placeholder="Pedido&#9;Cupom&#9;Data&#9;Valor bruto&#9;Desconto"
+          ></textarea>
+        </label>
+        <div class="button-row">
+          <button type="button" id="analyzeSalesImportButton">Analisar dados</button>
+          <button type="button" class="secondary-button" id="clearSalesImportButton">Limpar</button>
+        </div>
+        <div id="salesImportMessage" class="message" aria-live="polite"></div>
+        <div class="table-wrapper">
+          <table id="salesImportTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Pedido</th>
+                <th>Cupom</th>
+                <th>Data</th>
+                <th>Valor bruto</th>
+                <th>Desconto</th>
+                <th>Valor liquido</th>
+                <th>Comissão</th>
+                <th>Observações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="salesImportSummary" class="summary"></div>
+        <div class="button-row">
+          <button type="button" id="confirmSalesImportButton" disabled>
+            Salvar pedidos importados
+          </button>
+        </div>
+      </section>
     </div>
   </body>
 </html>

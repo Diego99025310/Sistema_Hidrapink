@@ -81,6 +81,16 @@
     return currencyFormatter.format(Number.isFinite(number) ? number : 0);
   };
 
+  const formatDateToBR = (value) => {
+    if (!value) return '-';
+    const iso = String(value).split('T')[0];
+    const parts = iso.split('-');
+    if (parts.length !== 3) return value;
+    const [year, month, day] = parts;
+    if (!year || !month || !day) return value;
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.padStart(4, '0')}`;
+  };
+
   const formatPercentage = (value) => {
     const number = Number(value);
     if (!Number.isFinite(number)) return '-';
@@ -1000,6 +1010,13 @@
     const reloadSalesButton = document.getElementById('reloadSalesButton');
     const salesTableBody = document.querySelector('#salesTable tbody');
     const salesSummaryEl = document.getElementById('salesSummary');
+    const salesImportTextarea = document.getElementById('salesImportInput');
+    const analyzeSalesImportButton = document.getElementById('analyzeSalesImportButton');
+    const clearSalesImportButton = document.getElementById('clearSalesImportButton');
+    const confirmSalesImportButton = document.getElementById('confirmSalesImportButton');
+    const salesImportMessage = document.getElementById('salesImportMessage');
+    const salesImportTableBody = document.querySelector('#salesImportTable tbody');
+    const salesImportSummaryEl = document.getElementById('salesImportSummary');
 
     addRealtimeValidation(form);
 
@@ -1007,6 +1024,8 @@
     let sales = [];
     let currentSalesInfluencerId = null;
     let saleEditingId = null;
+    let lastImportText = '';
+    let lastImportAnalysis = null;
 
     const getInfluencerByCoupon = (coupon) => {
       if (!coupon) return undefined;
@@ -1081,6 +1100,117 @@
       const totalCommission = document.createElement('span');
       totalCommission.textContent = `Sua comissão: ${formatCurrency(summary.total_commission)}`;
       salesSummaryEl.append(totalNet, totalCommission);
+    };
+
+    const updateImportConfirmState = () => {
+      if (!confirmSalesImportButton) return;
+      if (lastImportAnalysis && !lastImportAnalysis.hasErrors && lastImportAnalysis.validCount > 0) {
+        confirmSalesImportButton.removeAttribute('disabled');
+      } else {
+        confirmSalesImportButton.setAttribute('disabled', 'disabled');
+      }
+    };
+
+    const renderSalesImportTable = (rows) => {
+      if (!salesImportTableBody) return;
+      salesImportTableBody.innerHTML = '';
+      if (!Array.isArray(rows) || !rows.length) {
+        const emptyRow = document.createElement('tr');
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 9;
+        emptyCell.className = 'empty';
+        emptyCell.textContent = 'Nenhuma linha analisada.';
+        emptyRow.appendChild(emptyCell);
+        salesImportTableBody.appendChild(emptyRow);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      rows.forEach((row) => {
+        const isValid = !row.errors?.length;
+        const tr = document.createElement('tr');
+        tr.dataset.status = isValid ? 'ok' : 'error';
+
+        const statusTd = document.createElement('td');
+        statusTd.textContent = isValid ? `Linha ${row.line}: Pronto` : `Linha ${row.line}: Erro`;
+        tr.appendChild(statusTd);
+
+        const dateToDisplay = isValid ? formatDateToBR(row.date) : row.rawDate || '-';
+        const grossToDisplay = isValid
+          ? formatCurrency(row.grossValue)
+          : row.rawGross || (row.rawGross === '' ? '0' : '-');
+        const discountToDisplay = isValid
+          ? formatCurrency(row.discount)
+          : row.rawDiscount || (row.rawDiscount === '' ? '0' : '-');
+        const netToDisplay = isValid ? formatCurrency(row.netValue) : '-';
+        const commissionToDisplay = isValid ? formatCurrency(row.commission) : '-';
+
+        const cells = [
+          row.orderNumber || '-',
+          row.cupom || '-',
+          dateToDisplay,
+          grossToDisplay,
+          discountToDisplay,
+          netToDisplay,
+          commissionToDisplay
+        ];
+
+        cells.forEach((value) => {
+          const td = document.createElement('td');
+          td.textContent = value == null || value === '' ? '-' : String(value);
+          tr.appendChild(td);
+        });
+
+        const observationsTd = document.createElement('td');
+        observationsTd.textContent = row.errors?.length ? row.errors.join(' ') : '-';
+        tr.appendChild(observationsTd);
+
+        fragment.appendChild(tr);
+      });
+
+      salesImportTableBody.appendChild(fragment);
+    };
+
+    const renderSalesImportSummary = (analysis) => {
+      if (!salesImportSummaryEl) return;
+      salesImportSummaryEl.innerHTML = '';
+      if (!analysis || !analysis.totalCount) {
+        return;
+      }
+
+      const summaryItems = [
+        `Linhas analisadas: ${analysis.totalCount}`,
+        `Prontas: ${analysis.validCount}`
+      ];
+      if (analysis.errorCount) {
+        summaryItems.push(`Com erros: ${analysis.errorCount}`);
+      }
+      if (analysis.validCount) {
+        summaryItems.push(`Valor bruto: ${formatCurrency(analysis.summary?.totalGross)}`);
+        summaryItems.push(`Descontos: ${formatCurrency(analysis.summary?.totalDiscount)}`);
+        summaryItems.push(`Liquido: ${formatCurrency(analysis.summary?.totalNet)}`);
+        summaryItems.push(`Comissao: ${formatCurrency(analysis.summary?.totalCommission)}`);
+      }
+
+      summaryItems.forEach((text) => {
+        const span = document.createElement('span');
+        span.textContent = text;
+        salesImportSummaryEl.appendChild(span);
+      });
+    };
+
+    const resetSalesImport = ({ clearText = false, clearMessage = true } = {}) => {
+      lastImportAnalysis = null;
+      lastImportText = '';
+      if (clearText && salesImportTextarea) {
+        salesImportTextarea.value = '';
+      }
+      if (clearMessage) {
+        setMessage(salesImportMessage, '');
+      }
+      renderSalesImportTable([]);
+      renderSalesImportSummary(null);
+      updateImportConfirmState();
     };
 
     const resetSaleForm = ({ clearMessage = false, keepCoupon = true } = {}) => {
@@ -1299,6 +1429,103 @@
 
     reloadSalesButton?.addEventListener('click', () => {
       loadSalesForInfluencer(currentSalesInfluencerId, { showStatus: true });
+    });
+
+    analyzeSalesImportButton?.addEventListener('click', async () => {
+      if (!salesImportTextarea) return;
+      const text = salesImportTextarea.value.trim();
+      if (!text) {
+        resetSalesImport({ clearText: false, clearMessage: false });
+        setMessage(salesImportMessage, 'Cole os dados das vendas para analisar.', 'info');
+        return;
+      }
+
+      setMessage(salesImportMessage, 'Analisando dados...', 'info');
+      updateImportConfirmState();
+
+      try {
+        const analysis = await apiFetch('/sales/import/preview', {
+          method: 'POST',
+          body: { text }
+        });
+        lastImportText = text;
+        lastImportAnalysis = analysis;
+        renderSalesImportTable(analysis.rows);
+        renderSalesImportSummary(analysis);
+        if (!analysis.totalCount) {
+          setMessage(salesImportMessage, 'Nenhuma linha de venda foi encontrada.', 'info');
+        } else if (analysis.hasErrors) {
+          const errorsCount = analysis.errorCount ?? Math.max(analysis.totalCount - analysis.validCount, 0);
+          setMessage(
+            salesImportMessage,
+            `Encontramos ${errorsCount} linha(s) com problema. Corrija antes de concluir a importacao.`,
+            'error'
+          );
+        } else {
+          setMessage(
+            salesImportMessage,
+            `Todos os ${analysis.validCount} pedidos estao prontos para importacao.`,
+            'success'
+          );
+        }
+      } catch (error) {
+        lastImportAnalysis = null;
+        renderSalesImportTable([]);
+        renderSalesImportSummary(null);
+        setMessage(
+          salesImportMessage,
+          error.message || 'Nao foi possivel analisar os dados para importacao.',
+          'error'
+        );
+      }
+
+      updateImportConfirmState();
+    });
+
+    confirmSalesImportButton?.addEventListener('click', async () => {
+      if (!salesImportTextarea) return;
+      const text = (lastImportText || salesImportTextarea.value || '').trim();
+      if (!text) {
+        setMessage(salesImportMessage, 'Analise os dados antes de confirmar a importacao.', 'info');
+        updateImportConfirmState();
+        return;
+      }
+
+      confirmSalesImportButton.setAttribute('disabled', 'disabled');
+      setMessage(salesImportMessage, 'Salvando pedidos importados...', 'info');
+
+      try {
+        const result = await apiFetch('/sales/import/confirm', {
+          method: 'POST',
+          body: { text }
+        });
+        setMessage(
+          salesImportMessage,
+          `Importacao concluida! ${result.inserted} venda(s) foram cadastradas.`,
+          'success'
+        );
+        resetSalesImport({ clearText: true, clearMessage: false });
+        await loadSalesForInfluencer(currentSalesInfluencerId, { showStatus: true });
+      } catch (error) {
+        const analysis = error.data?.analysis;
+        if (analysis) {
+          lastImportAnalysis = analysis;
+          renderSalesImportTable(analysis.rows);
+          renderSalesImportSummary(analysis);
+        }
+        setMessage(
+          salesImportMessage,
+          error.message || 'Nao foi possivel concluir a importacao.',
+          'error'
+        );
+      } finally {
+        updateImportConfirmState();
+      }
+    });
+
+    clearSalesImportButton?.addEventListener('click', () => {
+      resetSalesImport({ clearText: true });
+      setMessage(salesImportMessage, 'Area de importacao limpa.', 'info');
     });
 
     loadInfluencersForSales();
