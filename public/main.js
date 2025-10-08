@@ -76,16 +76,23 @@
   };
 
   const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  const formatCurrency = (value) => {
-    const number = Number(value);
-    return currencyFormatter.format(Number.isFinite(number) ? number : 0);
+
+  const parseToNumber = (value) => {
+    if (typeof value === 'string') {
+      const normalized = value.replace(/\./g, '').replace(',', '.');
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const formatCurrency = (value) => currencyFormatter.format(parseToNumber(value));
+
   const integerFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
-  const formatInteger = (value) => {
-    const number = Number(value);
-    return integerFormatter.format(Number.isFinite(number) ? number : 0);
-  };
+  const formatInteger = (value) => integerFormatter.format(parseToNumber(value));
 
   const formatDateToBR = (value) => {
     if (!value) return '-';
@@ -1714,7 +1721,45 @@
       labelEl.textContent = `${label}:`;
       item.appendChild(labelEl);
 
-      const valueEl = createValueElement(value);
+      let valueEl = null;
+      if (key === 'link' && value && typeof value === 'object' && value.url) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'info-value detail-actions';
+
+        const linkEl = createValueElement(value);
+        if (linkEl) {
+          wrapper.appendChild(linkEl);
+        }
+
+        const copyButton = document.createElement('button');
+        copyButton.type = 'button';
+        copyButton.className = 'copy-button';
+        const defaultCopyLabel = 'Copiar';
+        copyButton.textContent = defaultCopyLabel;
+        copyButton.addEventListener('click', async () => {
+          try {
+            await copyTextToClipboard(value.url);
+            copyButton.textContent = 'Copiado!';
+            copyButton.classList.remove('error');
+            copyButton.classList.add('copied');
+          } catch (error) {
+            copyButton.textContent = 'Erro ao copiar';
+            copyButton.classList.remove('copied');
+            copyButton.classList.add('error');
+          }
+          window.setTimeout(() => {
+            copyButton.textContent = defaultCopyLabel;
+            copyButton.classList.remove('copied');
+            copyButton.classList.remove('error');
+          }, 2000);
+        });
+        wrapper.appendChild(copyButton);
+
+        valueEl = wrapper;
+      } else {
+        valueEl = createValueElement(value);
+      }
+
       if (valueEl) {
         item.appendChild(valueEl);
       }
@@ -1743,11 +1788,59 @@
     const greetingEl = document.getElementById('influencerGreeting');
 
     const salesMessageEl = document.getElementById('influencerSalesMessage');
+    const salesSummaryEl = document.getElementById('influencerSalesSummary');
     const salesTableBody = document.querySelector('#influencerSalesTable tbody');
+
+    const renderSalesSummary = (rows) => {
+      if (!salesSummaryEl) return;
+      salesSummaryEl.innerHTML = '';
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return;
+      }
+
+      const totalOrders = rows.length;
+      const totalCommission = rows.reduce((sum, sale) => {
+        const candidates = [
+          sale.commission,
+          sale.commission_value,
+          sale.valor_comissao,
+          sale.comissao,
+          sale.commissionValue,
+          sale.commissionAmount
+        ];
+        const commissionValue = candidates.find((candidate) => candidate != null && candidate !== '');
+        return sum + parseToNumber(commissionValue);
+      }, 0);
+
+      const fragment = document.createDocumentFragment();
+
+      const ordersMetric = document.createElement('div');
+      ordersMetric.className = 'sales-summary-metric';
+      const ordersLabel = document.createElement('span');
+      ordersLabel.textContent = 'Quantidade de vendas';
+      const ordersValue = document.createElement('strong');
+      ordersValue.textContent = formatInteger(totalOrders);
+      ordersMetric.appendChild(ordersLabel);
+      ordersMetric.appendChild(ordersValue);
+      fragment.appendChild(ordersMetric);
+
+      const commissionMetric = document.createElement('div');
+      commissionMetric.className = 'sales-summary-metric';
+      const commissionLabel = document.createElement('span');
+      commissionLabel.textContent = 'Total de comissão';
+      const commissionValueEl = document.createElement('strong');
+      commissionValueEl.textContent = formatCurrency(totalCommission);
+      commissionMetric.appendChild(commissionLabel);
+      commissionMetric.appendChild(commissionValueEl);
+      fragment.appendChild(commissionMetric);
+
+      salesSummaryEl.appendChild(fragment);
+    };
 
     const renderSalesTable = (rows) => {
       if (!salesTableBody) return;
       salesTableBody.innerHTML = '';
+      renderSalesSummary(rows);
       if (!Array.isArray(rows) || rows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
@@ -1761,18 +1854,61 @@
       const fragment = document.createDocumentFragment();
       rows.forEach((sale) => {
         const tr = document.createElement('tr');
-        const customerName =
-          sale.customer_name || sale.cliente || sale.customer || sale.client_name || sale.client || '-';
-        const valueToDisplay =
-          sale.net_value != null && sale.net_value !== ''
-            ? formatCurrency(sale.net_value)
-            : formatCurrency(sale.gross_value);
-        const statusLabel = sale.status || sale.status_label || sale.statusLabel || 'Concluída';
+        const orderCandidates = [
+          sale.order_number,
+          sale.orderNumber,
+          sale.numero_pedido,
+          sale.numeroPedido,
+          sale.order,
+          sale.pedido,
+          sale.id
+        ];
+        const orderValue = orderCandidates.find((candidate) => candidate != null && candidate !== '');
+        const orderDisplay = orderValue != null && orderValue !== '' ? String(orderValue) : '-';
+
+        const dateCandidates = [
+          sale.date,
+          sale.order_date,
+          sale.data,
+          sale.created_at,
+          sale.createdAt,
+          sale.sale_date
+        ];
+        const rawDate = dateCandidates.find((candidate) => candidate != null && candidate !== '');
+        const dateDisplay = rawDate ? formatDateToBR(rawDate) : '-';
+
+        const netCandidates = [
+          sale.net_value,
+          sale.netValue,
+          sale.valor_liquido,
+          sale.valorLiquidado,
+          sale.net,
+          sale.total_liquido,
+          sale.valor,
+          sale.value,
+          sale.amount,
+          sale.total,
+          sale.gross_value
+        ];
+        const netRaw = netCandidates.find((candidate) => candidate != null && candidate !== '');
+        const netDisplay = netRaw != null && netRaw !== '' ? formatCurrency(netRaw) : '-';
+
+        const commissionCandidates = [
+          sale.commission,
+          sale.commission_value,
+          sale.valor_comissao,
+          sale.comissao,
+          sale.commissionValue,
+          sale.commissionAmount
+        ];
+        const commissionRaw = commissionCandidates.find((candidate) => candidate != null && candidate !== '');
+        const commissionDisplay = commissionRaw != null && commissionRaw !== '' ? formatCurrency(commissionRaw) : '-';
+
         const cells = [
-          { label: 'Data', value: sale.date || '-' },
-          { label: 'Cliente', value: customerName },
-          { label: 'Valor', value: valueToDisplay },
-          { label: 'Status', value: statusLabel }
+          { label: 'Número do pedido', value: orderDisplay },
+          { label: 'Data', value: dateDisplay },
+          { label: 'Valor líquido', value: netDisplay },
+          { label: 'Comissão', value: commissionDisplay }
         ];
         cells.forEach(({ label, value }) => {
           const td = document.createElement('td');

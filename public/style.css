@@ -505,6 +505,13 @@ body[data-page='influencer'] .influencer-details-card .info-item {
   box-shadow: none;
 }
 
+body[data-page='influencer'] .influencer-details-card .info-item[data-field='link'] .detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 body[data-page='influencer']
   .influencer-details-card
   .info-item:not([data-field='nome']):not([data-field='cupom']):not([data-field='link']) {
@@ -532,12 +539,72 @@ body[data-page='influencer'] .influencer-details-card .info-status {
   color: rgba(102, 47, 73, 0.82);
 }
 
+body[data-page='influencer'] .influencer-details-card .card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+body[data-page='influencer'] .button-logout {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 210, 230, 0.95));
+  color: #e4447a;
+  border: 1px solid rgba(228, 68, 122, 0.28);
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 20px 36px rgba(228, 68, 122, 0.14);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+}
+
+body[data-page='influencer'] .button-logout:hover,
+body[data-page='influencer'] .button-logout:focus {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(255, 214, 233, 0.98), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 26px 48px rgba(228, 68, 122, 0.22);
+  outline: none;
+}
+
 body[data-page='influencer'] .influencer-history-card {
   gap: clamp(16px, 3vw, 24px);
 }
 
 body[data-page='influencer'] .sales-summary-wrapper {
   gap: 22px;
+}
+
+body[data-page='influencer'] .sales-summary-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+body[data-page='influencer'] .sales-summary-inline:empty {
+  display: none;
+}
+
+body[data-page='influencer'] .sales-summary-metric {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 177, 204, 0.35);
+  background: linear-gradient(135deg, rgba(255, 241, 248, 0.96), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 22px 42px rgba(255, 143, 181, 0.16);
+}
+
+body[data-page='influencer'] .sales-summary-metric span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(228, 68, 122, 0.85);
+}
+
+body[data-page='influencer'] .sales-summary-metric strong {
+  font-size: clamp(1.28rem, 3vw, 1.52rem);
+  font-weight: 700;
+  color: #ff418f;
 }
 
 body[data-page='influencer'] .sales-summary-wrapper .message {
@@ -828,6 +895,14 @@ button.copy-button:focus {
 
   body[data-page='influencer'] .card {
     padding: clamp(22px, 7vw, 32px);
+  }
+
+  body[data-page='influencer'] .influencer-details-card .card-actions {
+    justify-content: stretch;
+  }
+
+  body[data-page='influencer'] .influencer-details-card .button-logout {
+    width: 100%;
   }
 
   body[data-page='influencer'] .influencer-summary-item + .influencer-summary-item {

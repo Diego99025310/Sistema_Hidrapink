@@ -17,19 +17,23 @@
         <section class="card influencer-details-card" aria-labelledby="influencer-info-title">
           <h2 id="influencer-info-title" class="visually-hidden">Dados da influenciadora</h2>
           <div id="influencerDetails" class="info-grid" aria-live="polite"></div>
+          <div class="card-actions">
+            <button type="button" class="button-logout" data-action="logout">Sair</button>
+          </div>
         </section>
 
         <section class="card influencer-history-card" aria-labelledby="influencer-sales-title">
           <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
           <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
+          <div id="influencerSalesSummary" class="sales-summary-inline" aria-live="polite"></div>
           <div class="table-wrapper">
             <table id="influencerSalesTable">
               <thead>
                 <tr>
+                  <th>Número do pedido</th>
                   <th>Data</th>
-                  <th>Cliente</th>
-                  <th>Valor</th>
-                  <th>Status</th>
+                  <th>Valor líquido</th>
+                  <th>Comissão</th>
                 </tr>
               </thead>
               <tbody></tbody>
