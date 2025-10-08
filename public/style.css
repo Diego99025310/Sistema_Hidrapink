@@ -519,6 +519,13 @@ body[data-page='influencer'] .influencer-details-card .info-value a {
   color: var(--pink-strong);
 }
 
+body[data-page='influencer'] .influencer-details-card .info-status {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: rgba(102, 47, 73, 0.82);
+}
+
 body[data-page='influencer'] .influencer-history-card {
   gap: clamp(16px, 3vw, 24px);
 }

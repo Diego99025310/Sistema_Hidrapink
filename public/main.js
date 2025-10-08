@@ -1725,12 +1725,21 @@
     container.appendChild(fragment);
   };
 
+  const renderInfluencerStatus = (container, message) => {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!message) return;
+    const status = document.createElement('p');
+    status.className = 'info-status';
+    status.textContent = message;
+    container.appendChild(status);
+  };
+
   const initInfluencerPage = () => {
     if (!ensureAuth()) return;
     attachLogoutButtons();
 
     const detailsEl = document.getElementById('influencerDetails');
-    const messageEl = document.getElementById('influencerMessage');
     const greetingEl = document.getElementById('influencerGreeting');
 
     const salesMessageEl = document.getElementById('influencerSalesMessage');
@@ -1799,13 +1808,12 @@
     };
 
     const loadInfluencer = async () => {
-      setMessage(messageEl, 'Carregando dados...', 'info');
+      renderInfluencerStatus(detailsEl, 'Carregando dados...');
       try {
         const data = await apiFetch('/influenciadoras');
         const influencer = Array.isArray(data) ? data[0] : null;
         if (!influencer) {
-          setMessage(messageEl, 'Nenhum registro associado ao seu usuario.', 'info');
-          renderInfluencerDetails(detailsEl, null);
+          renderInfluencerStatus(detailsEl, 'Nenhum registro associado ao seu usuario.');
           renderSalesTable([]);
           setMessage(salesMessageEl, '', '');
           if (greetingEl) {
@@ -1818,14 +1826,13 @@
           const safeName = (influencer.nome || '').trim() || 'Pinklover';
           greetingEl.textContent = `Bem vinda, ${safeName}.`;
         }
-        setMessage(messageEl, '', '');
         loadInfluencerSales(influencer.id);
       } catch (error) {
         if (error.status === 401) {
           logout();
           return;
         }
-        setMessage(messageEl, error.message || 'Nao foi possivel carregar os dados.', 'error');
+        renderInfluencerStatus(detailsEl, error.message || 'Nao foi possivel carregar os dados.');
         if (greetingEl) {
           greetingEl.textContent = 'Bem vinda, Pinklover.';
         }
