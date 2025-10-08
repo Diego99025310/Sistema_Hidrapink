@@ -1834,8 +1834,68 @@
       salesTableBody.appendChild(fragment);
     };
 
+    const createInfluencerSummaryMetric = (label, value, helper) => {
+      const metric = document.createElement('div');
+      metric.className = 'influencer-summary-item';
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'influencer-summary-label';
+      labelEl.textContent = label;
+      metric.appendChild(labelEl);
+
+      const valueEl = document.createElement('strong');
+      valueEl.textContent = value;
+      metric.appendChild(valueEl);
+
+      if (helper) {
+        const helperEl = document.createElement('span');
+        helperEl.className = 'influencer-summary-helper';
+        helperEl.textContent = helper;
+        metric.appendChild(helperEl);
+      }
+
+      return metric;
+    };
+
     const renderSalesSummary = (summary, { totalSales = 0 } = {}) => {
-      renderSummaryMetrics(salesSummaryEl, buildSalesSummaryMetrics(summary, totalSales));
+      if (!salesSummaryEl) return;
+      salesSummaryEl.innerHTML = '';
+
+      let safeTotalSales = Number(totalSales);
+      if (!Number.isFinite(safeTotalSales) || safeTotalSales < 0) {
+        safeTotalSales = 0;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'influencer-summary-card';
+
+      const caption = document.createElement('span');
+      caption.className = 'influencer-summary-caption';
+      caption.textContent = 'Resumo atualizado';
+      card.appendChild(caption);
+
+      const metricsWrapper = document.createElement('div');
+      metricsWrapper.className = 'influencer-summary-metrics';
+
+      const totalSalesHelper =
+        safeTotalSales === 0
+          ? 'Nenhuma venda registrada ainda'
+          : `${formatInteger(safeTotalSales)} ${safeTotalSales === 1 ? 'pedido registrado' : 'pedidos registrados'}`;
+
+      metricsWrapper.appendChild(
+        createInfluencerSummaryMetric('Total em vendas', formatCurrency(summary?.total_net ?? 0), totalSalesHelper)
+      );
+
+      metricsWrapper.appendChild(
+        createInfluencerSummaryMetric(
+          'Sua comissão',
+          formatCurrency(summary?.total_commission ?? 0),
+          'Estimativa com base no total líquido'
+        )
+      );
+
+      card.appendChild(metricsWrapper);
+      salesSummaryEl.appendChild(card);
     };
 
     const loadInfluencerSales = async (influencerId) => {

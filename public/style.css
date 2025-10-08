@@ -254,71 +254,80 @@ button.secondary-button:focus {
 }
 
 .message {
-  min-height: 52px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(228, 68, 122, 0.25);
-  background: rgba(251, 211, 219, 0.45);
-  padding: 16px 18px;
+  min-height: 44px;
+  border-radius: 16px;
+  border: 1px solid rgba(228, 68, 122, 0.18);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 14px 18px;
   font-size: 0.95rem;
   color: var(--text-secondary);
-  transition: background var(--transition), border var(--transition), color var(--transition);
+  box-shadow: 0 14px 30px rgba(228, 68, 122, 0.12);
+  transition: background var(--transition), border var(--transition), color var(--transition), box-shadow var(--transition);
 }
 
 .message[data-type='success'] {
-  background: rgba(52, 211, 153, 0.15);
-  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(255, 255, 255, 0.92));
+  border-color: rgba(16, 185, 129, 0.28);
   color: #0f5132;
+  box-shadow: 0 18px 40px rgba(16, 185, 129, 0.18);
 }
 
 .message[data-type='error'] {
-  background: rgba(248, 113, 113, 0.18);
-  border-color: rgba(220, 38, 38, 0.4);
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.16), rgba(255, 255, 255, 0.95));
+  border-color: rgba(220, 38, 38, 0.32);
   color: #7f1d1d;
+  box-shadow: 0 18px 40px rgba(220, 38, 38, 0.15);
 }
 
 .message[data-type='info'] {
-  background: rgba(79, 195, 247, 0.15);
-  border-color: rgba(14, 165, 233, 0.4);
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.15), rgba(255, 255, 255, 0.94));
+  border-color: rgba(14, 165, 233, 0.32);
   color: #0b5c7a;
+  box-shadow: 0 18px 40px rgba(14, 165, 233, 0.16);
 }
 
 .table-wrapper {
   width: 100%;
-  overflow-x: auto;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(228, 68, 122, 0.18);
-  background: #fff;
-  box-shadow: inset 0 0 0 1px rgba(251, 211, 219, 0.4);
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(228, 68, 122, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 44px rgba(228, 68, 122, 0.16);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 560px;
+  min-width: 0;
 }
 
 table thead tr {
-  background: linear-gradient(135deg, rgba(228, 68, 122, 0.95), rgba(240, 121, 153, 0.9));
-  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 233, 245, 0.92), rgba(255, 255, 255, 0.98));
+  color: var(--text-primary);
 }
 
 table th,
 table td {
-  padding: 14px 16px;
+  padding: 16px 18px;
   text-align: left;
   font-size: 0.95rem;
 }
 
-table tbody tr:nth-child(even) {
-  background: rgba(251, 211, 219, 0.55);
+table thead th {
+  font-weight: 600;
 }
 
-table tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.92);
+table tbody tr {
+  background: transparent;
+  transition: background var(--transition);
+}
+
+table tbody tr + tr {
+  border-top: 1px solid rgba(228, 68, 122, 0.16);
 }
 
 table tbody tr:hover {
-  background: rgba(240, 121, 153, 0.18);
+  background: rgba(255, 233, 245, 0.35);
 }
 
 table tbody td:last-child {
@@ -421,6 +430,192 @@ table tbody td:last-child {
   margin: 0;
 }
 
+/* Influencer panel */
+body[data-page='influencer'] {
+  background: linear-gradient(180deg, rgba(255, 237, 246, 0.65), rgba(255, 255, 255, 0.9));
+  padding: clamp(28px, 6vw, 72px) clamp(18px, 6vw, 48px);
+}
+
+body[data-page='influencer'] .container {
+  width: min(100%, 860px);
+  gap: clamp(24px, 4vw, 32px);
+}
+
+body[data-page='influencer'] header.page-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(18px, 4vw, 32px);
+  text-align: left;
+  padding: clamp(28px, 6vw, 40px);
+  border-radius: 32px;
+  background: linear-gradient(135deg, #ff6aa2, #ffcfe4);
+  color: #fff;
+  box-shadow: var(--shadow-hero);
+}
+
+body[data-page='influencer'] header.page-hero .hero-text {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+
+body[data-page='influencer'] header.page-hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+
+body[data-page='influencer'] header.page-hero p {
+  margin: 0;
+  font-size: clamp(0.95rem, 2.6vw, 1.1rem);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+body[data-page='influencer'] header.page-hero button {
+  align-self: flex-start;
+  box-shadow: 0 18px 42px rgba(255, 255, 255, 0.32);
+}
+
+body[data-page='influencer'] .card {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(228, 68, 122, 0.18);
+  border-radius: 28px;
+  padding: clamp(26px, 5vw, 38px);
+  box-shadow: 0 24px 48px rgba(228, 68, 122, 0.16);
+  backdrop-filter: blur(4px);
+}
+
+body[data-page='influencer'] .card-heading {
+  text-align: left;
+  gap: 6px;
+}
+
+body[data-page='influencer'] .card h2 {
+  text-align: left;
+  font-size: clamp(1.4rem, 3.6vw, 1.8rem);
+}
+
+body[data-page='influencer'] .card-subtitle {
+  color: var(--text-muted);
+}
+
+body[data-page='influencer'] .info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+body[data-page='influencer'] .info-item {
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(228, 68, 122, 0.18);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 232, 244, 0.82));
+  box-shadow: 0 18px 38px rgba(228, 68, 122, 0.1);
+}
+
+body[data-page='influencer'] .info-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+body[data-page='influencer'] .info-value {
+  font-size: 1.08rem;
+  color: var(--text-primary);
+}
+
+body[data-page='influencer'] .info-value.detail-actions {
+  gap: 10px;
+}
+
+body[data-page='influencer'] button.copy-button {
+  background: rgba(228, 68, 122, 0.12);
+  border: 1px solid rgba(228, 68, 122, 0.25);
+  color: var(--pink-strong);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  box-shadow: none;
+}
+
+body[data-page='influencer'] button.copy-button:hover,
+body[data-page='influencer'] button.copy-button:focus {
+  box-shadow: 0 10px 20px rgba(228, 68, 122, 0.18);
+  background: rgba(228, 68, 122, 0.2);
+}
+
+body[data-page='influencer'] .sales-summary-wrapper {
+  gap: 18px;
+}
+
+body[data-page='influencer'] .sales-summary-wrapper .message {
+  margin-top: 0;
+}
+
+body[data-page='influencer'] .influencer-summary {
+  display: block;
+}
+
+body[data-page='influencer'] .influencer-summary:empty {
+  display: none;
+}
+
+body[data-page='influencer'] .influencer-summary-card {
+  padding: 22px 26px;
+  border-radius: 24px;
+  border: 1px solid rgba(228, 68, 122, 0.18);
+  background: linear-gradient(135deg, rgba(255, 233, 245, 0.88), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 22px 44px rgba(228, 68, 122, 0.16);
+  display: grid;
+  gap: 18px;
+}
+
+body[data-page='influencer'] .influencer-summary-caption {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pink-strong);
+  margin: 0;
+}
+
+body[data-page='influencer'] .influencer-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+
+body[data-page='influencer'] .influencer-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+body[data-page='influencer'] .influencer-summary-item strong {
+  font-size: clamp(1.35rem, 3vw, 1.58rem);
+  color: var(--pink-strong);
+}
+
+body[data-page='influencer'] .influencer-summary-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+body[data-page='influencer'] .influencer-summary-item + .influencer-summary-item {
+  border-left: 1px solid rgba(228, 68, 122, 0.22);
+  padding-left: 24px;
+  margin-left: 12px;
+}
+
+body[data-page='influencer'] .influencer-summary-helper {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 @media (min-width: 992px) {
   .sales-summary-wrapper {
     flex-direction: row;
@@ -428,6 +623,11 @@ table tbody td:last-child {
   }
 
   .sales-summary-wrapper .summary {
+    flex: 1;
+    min-height: 100%;
+  }
+
+  .sales-summary-wrapper .influencer-summary {
     flex: 1;
     min-height: 100%;
   }
@@ -608,6 +808,29 @@ button.copy-button:focus {
     padding: clamp(20px, 6vw, 28px);
   }
 
+  body[data-page='influencer'] header.page-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body[data-page='influencer'] header.page-hero button {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  body[data-page='influencer'] .card {
+    padding: clamp(22px, 7vw, 32px);
+  }
+
+  body[data-page='influencer'] .influencer-summary-item + .influencer-summary-item {
+    border-left: none;
+    border-top: 1px solid rgba(228, 68, 122, 0.18);
+    padding-left: 0;
+    margin-left: 0;
+    padding-top: 16px;
+    margin-top: 8px;
+  }
+
   .summary {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -655,6 +878,14 @@ button.copy-button:focus {
 
   .summary-helper {
     font-size: 0.85rem;
+  }
+
+  body[data-page='influencer'] .influencer-summary-card {
+    padding: 20px 22px;
+  }
+
+  body[data-page='influencer'] .influencer-summary-metrics {
+    grid-template-columns: 1fr;
   }
 
   .table-wrapper {
