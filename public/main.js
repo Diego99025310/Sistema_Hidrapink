@@ -989,6 +989,7 @@
 
     const form = document.getElementById('createSaleForm');
     const messageEl = document.getElementById('salesMessage');
+    const saleOrderInput = form?.elements.orderNumber || form?.elements.order_number || null;
     const saleCouponSelect = document.getElementById('saleCouponSelect');
     const saleDateInput = form?.elements.saleDate || null;
     const saleGrossInput = form?.elements.grossValue || null;
@@ -1031,7 +1032,7 @@
       if (!Array.isArray(sales) || sales.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 7;
+        emptyCell.colSpan = 8;
         emptyCell.className = 'empty';
         emptyCell.textContent = 'Nenhuma venda cadastrada.';
         emptyRow.appendChild(emptyCell);
@@ -1043,8 +1044,9 @@
         const tr = document.createElement('tr');
         tr.dataset.id = String(sale.id);
         const cells = [
-          sale.date || '-',
+          sale.order_number || sale.orderNumber || '-',
           sale.cupom || '-',
+          sale.date || '-',
           formatCurrency(sale.gross_value),
           formatCurrency(sale.discount),
           formatCurrency(sale.net_value),
@@ -1200,23 +1202,31 @@
       event.preventDefault();
       if (!form) return;
 
+      const orderNumber = (saleOrderInput?.value || '').trim();
       const coupon = (saleCouponSelect?.value || '').trim();
       const date = saleDateInput?.value || '';
       const gross = Number(saleGrossInput?.value || 0);
       const discount = Number(saleDiscountInput?.value || 0);
 
+      flagInvalidField(saleOrderInput, Boolean(orderNumber));
       flagInvalidField(saleCouponSelect, Boolean(coupon));
       flagInvalidField(saleDateInput, Boolean(date));
       flagInvalidField(saleGrossInput, Number.isFinite(gross) && gross >= 0);
       flagInvalidField(saleDiscountInput, Number.isFinite(discount) && discount >= 0 && discount <= gross);
 
-      if (!coupon || !date || !Number.isFinite(gross) || gross < 0 || !Number.isFinite(discount) || discount < 0 || discount > gross) {
-        setMessage(messageEl, 'Verifique os campos da venda. Desconto nao pode ser maior que o valor bruto.', 'error');
+      const hasInvalidNumbers = !Number.isFinite(gross) || gross < 0 || !Number.isFinite(discount) || discount < 0 || discount > gross;
+
+      if (!orderNumber || !coupon || !date || hasInvalidNumbers) {
+        setMessage(
+          messageEl,
+          'Verifique os campos da venda. Pedido é obrigatório e o desconto nao pode ser maior que o valor bruto.',
+          'error'
+        );
         focusFirstInvalidField(form);
         return;
       }
 
-      const payload = { cupom: coupon, date, grossValue: gross, discount };
+      const payload = { orderNumber, cupom: coupon, date, grossValue: gross, discount };
       const endpoint = saleEditingId ? `/sales/${saleEditingId}` : '/sales';
       const method = saleEditingId ? 'PUT' : 'POST';
 
@@ -1248,6 +1258,15 @@
         form.dataset.mode = 'edit';
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) submitBtn.textContent = 'Salvar venda';
+        if (saleOrderInput) {
+          const orderValue =
+            sale.order_number != null
+              ? String(sale.order_number)
+              : sale.orderNumber != null
+                ? String(sale.orderNumber)
+                : '';
+          saleOrderInput.value = orderValue;
+        }
         if (saleCouponSelect) saleCouponSelect.value = sale.cupom || '';
         if (saleDateInput) saleDateInput.value = sale.date || '';
         if (saleGrossInput) saleGrossInput.value = sale.gross_value != null ? String(sale.gross_value) : '';

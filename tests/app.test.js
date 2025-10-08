@@ -142,9 +142,16 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   const saleResponse = await request(app)
     .post('/sales')
     .set('Authorization', `Bearer ${masterToken}`)
-    .send({ cupom: influencerPayload.cupom, date: '2025-10-01', grossValue: 1000, discount: 100 });
+    .send({
+      orderNumber: 'PED-001',
+      cupom: influencerPayload.cupom,
+      date: '2025-10-01',
+      grossValue: 1000,
+      discount: 100
+    });
 
   assert.strictEqual(saleResponse.status, 201);
+  assert.strictEqual(saleResponse.body.order_number, 'PED-001');
   assert.strictEqual(Number(saleResponse.body.net_value), 900);
   assert.strictEqual(Number(saleResponse.body.commission), 112.5);
   const saleId = saleResponse.body.id;
@@ -174,8 +181,15 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   const updateSale = await request(app)
     .put(`/sales/${saleId}`)
     .set('Authorization', `Bearer ${masterToken}`)
-    .send({ cupom: influencerPayload.cupom, date: '2025-10-02', grossValue: 1000, discount: 50 });
+    .send({
+      orderNumber: 'PED-001-ALT',
+      cupom: influencerPayload.cupom,
+      date: '2025-10-02',
+      grossValue: 1000,
+      discount: 50
+    });
   assert.strictEqual(updateSale.status, 200);
+  assert.strictEqual(updateSale.body.order_number, 'PED-001-ALT');
   assert.strictEqual(Number(updateSale.body.net_value), 950);
   assert.strictEqual(Number(updateSale.body.commission), 118.75);
 

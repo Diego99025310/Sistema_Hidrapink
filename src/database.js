@@ -218,6 +218,7 @@ if (client === 'mysql') {
       CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
         influencer_id INT NOT NULL,
+        order_number VARCHAR(100),
         date DATE NOT NULL,
         gross_value DECIMAL(12,2) NOT NULL CHECK (gross_value >= 0),
         discount DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
@@ -243,6 +244,17 @@ if (client === 'mysql') {
         INDEX idx_password_resets_user (user_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    const salesColumns = await db.all(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+      [config.database, 'sales']
+    );
+    const hasOrderNumberColumn = Array.isArray(salesColumns)
+      ? salesColumns.some((column) => column.COLUMN_NAME === 'order_number')
+      : false;
+    if (!hasOrderNumberColumn) {
+      await db.exec('ALTER TABLE sales ADD COLUMN order_number VARCHAR(100);');
+    }
   };
 
   const config = getMysqlConfig();
@@ -470,6 +482,7 @@ if (client === 'mysql') {
     CREATE TABLE ${tableName} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       influencer_id INTEGER NOT NULL,
+      order_number TEXT,
       date TEXT NOT NULL,
       gross_value REAL NOT NULL CHECK (gross_value >= 0),
       discount REAL NOT NULL DEFAULT 0 CHECK (discount >= 0),
@@ -481,9 +494,15 @@ if (client === 'mysql') {
   `;
 
   const ensureSalesTable = () => {
-    const tableInfo = db.prepare('PRAGMA table_info(sales)').all();
+    let tableInfo = db.prepare('PRAGMA table_info(sales)').all();
     if (!tableInfo.length) {
       db.exec(createSalesTable());
+      tableInfo = db.prepare('PRAGMA table_info(sales)').all();
+    }
+
+    const hasOrderNumber = tableInfo.some((column) => column.name === 'order_number');
+    if (!hasOrderNumber) {
+      db.exec('ALTER TABLE sales ADD COLUMN order_number TEXT;');
     }
   };
 

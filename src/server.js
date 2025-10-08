@@ -149,6 +149,7 @@ const findInfluencerByCouponStmt = db.prepare(`${influencerBaseQuery} WHERE i.cu
 const insertSaleStmt = db.prepare(`
   INSERT INTO sales (
     influencer_id,
+    order_number,
     date,
     gross_value,
     discount,
@@ -156,6 +157,7 @@ const insertSaleStmt = db.prepare(`
     commission
   ) VALUES (
     @influencer_id,
+    @order_number,
     @date,
     @gross_value,
     @discount,
@@ -167,6 +169,7 @@ const insertSaleStmt = db.prepare(`
 const updateSaleStmt = db.prepare(`
   UPDATE sales SET
     influencer_id = @influencer_id,
+    order_number = @order_number,
     date = @date,
     gross_value = @gross_value,
     discount = @discount,
@@ -179,6 +182,7 @@ const deleteSaleStmt = db.prepare('DELETE FROM sales WHERE id = ?');
 const findSaleByIdStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -195,6 +199,7 @@ const findSaleByIdStmt = db.prepare(`
 const listSalesByInfluencerStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
+         s.order_number,
          s.date,
          s.gross_value,
          s.discount,
@@ -425,6 +430,7 @@ const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
 const formatSaleRow = (row) => ({
   id: row.id,
   influencer_id: row.influencer_id,
+  order_number: row.order_number || null,
   cupom: row.cupom || null,
   nome: row.nome || null,
   date: row.date,
@@ -469,11 +475,19 @@ const ensureInfluencerAccess = (req, influencerId) => {
 };
 
 const normalizeSaleBody = (body) => {
+  const orderNumberRaw = body?.orderNumber ?? body?.order_number ?? body?.pedido ?? body?.order;
+  const orderNumber = orderNumberRaw == null ? '' : String(trimString(orderNumberRaw)).trim();
   const cupom = trimString(body?.cupom);
   const date = trimString(body?.date);
   const grossRaw = body?.grossValue ?? body?.gross_value;
   const discountRaw = body?.discount ?? body?.discountValue ?? body?.discount_value ?? 0;
 
+  if (!orderNumber) {
+    return { error: { error: 'Informe o numero do pedido.' } };
+  }
+  if (orderNumber.length > 100) {
+    return { error: { error: 'Numero do pedido deve ter no maximo 100 caracteres.' } };
+  }
   if (!cupom) {
     return { error: { error: 'Informe o cupom da influenciadora.' } };
   }
@@ -497,6 +511,7 @@ const normalizeSaleBody = (body) => {
 
   return {
     data: {
+      orderNumber,
       cupom,
       date,
       grossValue: grossParsed.value,
@@ -697,6 +712,7 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
   try {
     const result = insertSaleStmt.run({
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
@@ -738,6 +754,7 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     updateSaleStmt.run({
       id: saleId,
       influencer_id: influencer.id,
+      order_number: data.orderNumber,
       date: data.date,
       gross_value: data.grossValue,
       discount: data.discount,
