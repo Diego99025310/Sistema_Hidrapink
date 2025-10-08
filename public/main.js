@@ -1737,6 +1737,9 @@
 
     const items = [
       ['Nome', data.nome],
+      ['Instagram', instagramValue],
+      ['E-mail', emailValue],
+      ['Contato', contactValue],
       ['Cupom', data.cupom],
       [
         'Link de desconto',
