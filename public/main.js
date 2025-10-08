@@ -1637,8 +1637,49 @@
       return el;
     };
 
+    const instagramHandle = (data.instagram || '').trim();
+    const hasInstagram = instagramHandle && instagramHandle !== '-';
+    const instagramLabel = hasInstagram
+      ? instagramHandle.startsWith('@')
+        ? instagramHandle
+        : `@${instagramHandle}`
+      : data.instagram;
+    const instagramValue = hasInstagram
+      ? {
+          type: 'link',
+          url: `https://www.instagram.com/${instagramHandle.replace(/^@/, '')}`,
+          label: instagramLabel,
+          external: true
+        }
+      : data.instagram;
+
+    const emailValue =
+      data.email && data.email !== '-'
+        ? { type: 'link', url: `mailto:${data.email}`, label: data.email, external: false }
+        : data.email;
+
+    const contactDigits = digitOnly(data.contato);
+    const contactValue =
+      data.contato && data.contato !== '-' && contactDigits
+        ? { type: 'link', url: `tel:+55${contactDigits}`, label: data.contato, external: false }
+        : data.contato;
+
+    const loginEmailValue =
+      data.loginEmail && data.loginEmail !== '-'
+        ? { type: 'link', url: `mailto:${data.loginEmail}`, label: data.loginEmail, external: false }
+        : data.loginEmail;
+
+    const addressParts = [data.logradouro, data.numero].filter((part) => part && part !== '-');
+    const addressValue = addressParts.length ? addressParts.join(', ') : data.logradouro;
+
+    const locationParts = [data.cidade, data.estado].filter((part) => part && part !== '-');
+    const locationValue = locationParts.length ? locationParts.join(' / ') : '-';
+
     const items = [
       ['Nome', data.nome],
+      ['Instagram', instagramValue],
+      ['E-mail', emailValue],
+      ['Contato', contactValue],
       ['Cupom', data.cupom],
       [
         'Link',
@@ -1649,7 +1690,17 @@
               label: data.discountLink
             }
           : '-'
-      ]
+      ],
+      ['E-mail', emailValue],
+      ['Contato', contactValue],
+      ['Instagram', instagramValue],
+      ['Comissão', data.commissionPercent],
+      ['Login de acesso', loginEmailValue],
+      ['Localização', locationValue],
+      ['Endereço', addressValue],
+      ['Complemento', data.complemento],
+      ['Bairro', data.bairro],
+      ['CEP', data.cep]
     ];
 
     const fragment = document.createDocumentFragment();
