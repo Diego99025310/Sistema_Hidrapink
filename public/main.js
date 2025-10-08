@@ -1616,56 +1616,8 @@
       return;
     }
 
-    const createCopyLinkElement = (value) => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'info-value detail-actions';
-      if (!value?.url) {
-        wrapper.textContent = '-';
-        return wrapper;
-      }
-
-      const linkLabel = value.label || value.url;
-      const anchor = document.createElement('a');
-      anchor.href = value.url;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.className = 'detail-link';
-      anchor.textContent = linkLabel;
-      wrapper.appendChild(anchor);
-
-      const copyBtn = document.createElement('button');
-      copyBtn.type = 'button';
-      copyBtn.className = 'copy-button';
-      const defaultCopyLabel = value.copyLabel || 'Copiar link';
-      copyBtn.textContent = defaultCopyLabel;
-      const successLabel = value.successLabel || 'Copiado!';
-      const errorLabel = value.errorLabel || 'Tente novamente';
-
-      copyBtn.addEventListener('click', async () => {
-        try {
-          await copyTextToClipboard(value.url);
-          copyBtn.textContent = successLabel;
-          copyBtn.classList.add('copied');
-        } catch (error) {
-          console.error(error);
-          copyBtn.textContent = errorLabel;
-          copyBtn.classList.add('error');
-        }
-        window.setTimeout(() => {
-          copyBtn.textContent = defaultCopyLabel;
-          copyBtn.classList.remove('copied', 'error');
-        }, 2000);
-      });
-
-      wrapper.appendChild(copyBtn);
-      return wrapper;
-    };
-
     const createValueElement = (value) => {
       if (value && typeof value === 'object') {
-        if (value.type === 'copy-link') {
-          return createCopyLinkElement(value);
-        }
         if (value.type === 'link' && value.url) {
           const anchor = document.createElement('a');
           anchor.href = value.url;
@@ -1733,10 +1685,9 @@
         'Link',
         data.discountLink && data.discountLink !== '-'
           ? {
-              type: 'copy-link',
+              type: 'link',
               url: data.discountLink,
-              label: data.discountLink,
-              copyLabel: 'Copiar link'
+              label: data.discountLink
             }
           : '-'
       ],

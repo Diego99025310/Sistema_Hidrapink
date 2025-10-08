@@ -523,26 +523,6 @@ body[data-page='influencer'] .influencer-history-card {
   gap: clamp(16px, 3vw, 24px);
 }
 
-body[data-page='influencer'] .info-value.detail-actions {
-  gap: 12px;
-}
-
-body[data-page='influencer'] button.copy-button {
-  background: rgba(255, 105, 160, 0.12);
-  border: 1px solid rgba(255, 105, 160, 0.24);
-  color: #ff3f8f;
-  padding: 9px 20px;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  box-shadow: none;
-}
-
-body[data-page='influencer'] button.copy-button:hover,
-body[data-page='influencer'] button.copy-button:focus {
-  box-shadow: 0 12px 22px rgba(255, 105, 160, 0.22);
-  background: rgba(255, 105, 160, 0.2);
-}
-
 body[data-page='influencer'] .sales-summary-wrapper {
   gap: 22px;
 }
