@@ -287,7 +287,7 @@ if (client === 'mysql') {
     if (process.env.DATABASE_PATH) {
       return path.resolve(process.env.DATABASE_PATH);
     }
-    return path.join(__dirname, '..', 'meu_banco.sqlite');
+    return path.join(__dirname, '..', 'database.sqlite');
   };
 
   const dbPath = resolveDatabasePath();
