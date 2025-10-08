@@ -281,25 +281,7 @@ if (client === 'mysql') {
 
   module.exports = db;
 } else {
-  const buildSqliteDriverError = (error) => {
-    const guidance = [
-      'Nao foi possivel carregar o driver SQLite (better-sqlite3).',
-      `Versao do Node.js detectada: ${process.versions?.node || 'desconhecida'}.`,
-      'Reinstale as dependencias com "npm install" utilizando esta mesma versao do Node ou remova a pasta node_modules antes de reinstalar.',
-      'Caso esteja utilizando uma versao antiga do Node (como 12.x ou 14.x), atualize para uma versao suportada ou garanta que o pacote better-sqlite3 foi reinstalado para essa versao.'
-    ];
-
-    const detailed = new Error(`${guidance.join('\n')}${error?.message ? `\n\nErro original: ${error.message}` : ''}`);
-    detailed.cause = error;
-    return detailed;
-  };
-
-  let Database;
-  try {
-    Database = require('better-sqlite3');
-  } catch (error) {
-    throw buildSqliteDriverError(error);
-  }
+  const Database = require('better-sqlite3');
 
   const resolveDatabasePath = () => {
     if (process.env.DATABASE_PATH) {
@@ -309,12 +291,7 @@ if (client === 'mysql') {
   };
 
   const dbPath = resolveDatabasePath();
-  let db;
-  try {
-    db = new Database(dbPath);
-  } catch (error) {
-    throw buildSqliteDriverError(error);
-  }
+  const db = new Database(dbPath);
 
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
