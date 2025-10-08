@@ -427,20 +427,35 @@ const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
   return { netValue, commissionValue };
 };
 
-const formatSaleRow = (row) => ({
-  id: row.id,
-  influencer_id: row.influencer_id,
-  order_number: row.order_number || null,
-  cupom: row.cupom || null,
-  nome: row.nome || null,
-  date: row.date,
-  gross_value: Number(row.gross_value),
-  discount: Number(row.discount),
-  net_value: Number(row.net_value),
-  commission: Number(row.commission),
-  commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
-  created_at: row.created_at
-});
+const normalizeOrderNumber = (value) => {
+  if (value == null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized ? normalized : null;
+};
+
+const formatSaleRow = (row) => {
+  const orderNumber = normalizeOrderNumber(
+    row?.order_number ?? row?.orderNumber ?? row?.pedido ?? null
+  );
+
+  return {
+    id: row.id,
+    influencer_id: row.influencer_id,
+    order_number: orderNumber,
+    orderNumber,
+    cupom: row.cupom || null,
+    nome: row.nome || null,
+    date: row.date,
+    gross_value: Number(row.gross_value),
+    discount: Number(row.discount),
+    net_value: Number(row.net_value),
+    commission: Number(row.commission),
+    commission_rate: row.commission_rate != null ? Number(row.commission_rate) : 0,
+    created_at: row.created_at
+  };
+};
 
 const createInfluencerTransaction = db.transaction((influencerPayload, userPayload) => {
   const mustChange = userPayload.mustChange ?? 0;

@@ -15,6 +15,8 @@ process.env.JWT_SECRET = 'test-secret';
 const app = require('../src/server');
 const db = require('../src/database');
 
+const selectSaleOrderNumberStmt = db.prepare('SELECT order_number FROM sales WHERE id = ?');
+
 const MASTER_EMAIL = process.env.MASTER_EMAIL || 'master@example.com';
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD || 'master123';
 
@@ -156,6 +158,10 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(Number(saleResponse.body.commission), 112.5);
   const saleId = saleResponse.body.id;
 
+  const createdSaleRecord = selectSaleOrderNumberStmt.get(saleId);
+  assert.ok(createdSaleRecord, 'Venda deve ser persistida no banco de dados.');
+  assert.strictEqual(createdSaleRecord.order_number, 'PED-001');
+
   const listSales = await request(app)
     .get(`/sales/${influencerId}`)
     .set('Authorization', `Bearer ${masterToken}`);
@@ -192,6 +198,10 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(updateSale.body.order_number, 'PED-001-ALT');
   assert.strictEqual(Number(updateSale.body.net_value), 950);
   assert.strictEqual(Number(updateSale.body.commission), 118.75);
+
+  const updatedSaleRecord = selectSaleOrderNumberStmt.get(saleId);
+  assert.ok(updatedSaleRecord, 'Venda atualizada deve existir no banco de dados.');
+  assert.strictEqual(updatedSaleRecord.order_number, 'PED-001-ALT');
 
   const consultAfterUpdate = await request(app)
     .get('/influenciadoras/consulta')
