@@ -179,7 +179,6 @@ const updateSaleStmt = db.prepare(`
 `);
 
 const deleteSaleStmt = db.prepare('DELETE FROM sales WHERE id = ?');
-const findSaleByOrderNumberStmt = db.prepare('SELECT id FROM sales WHERE order_number = ?');
 const findSaleByIdStmt = db.prepare(`
   SELECT s.id,
          s.influencer_id,
@@ -723,11 +722,6 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
-  const existingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
-  if (existingSale) {
-    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
-  }
-
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
@@ -743,9 +737,6 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     const created = findSaleByIdStmt.get(result.lastInsertRowid);
     return res.status(201).json(formatSaleRow(created));
   } catch (err) {
-    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
-      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
-    }
     console.error('Erro ao cadastrar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a venda.' });
   }
@@ -772,11 +763,6 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     return res.status(404).json({ error: 'Cupom nao encontrado.' });
   }
 
-  const conflictingSale = findSaleByOrderNumberStmt.get(data.orderNumber);
-  if (conflictingSale && conflictingSale.id !== saleId) {
-    return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
-  }
-
   const { netValue, commissionValue } = computeSaleTotals(data.grossValue, data.discount, influencer.commission_rate || 0);
 
   try {
@@ -794,9 +780,6 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     const updated = findSaleByIdStmt.get(saleId);
     return res.status(200).json(formatSaleRow(updated));
   } catch (err) {
-    if (err && (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'ER_DUP_ENTRY')) {
-      return res.status(409).json({ error: 'Ja existe uma venda com esse numero de pedido.' });
-    }
     console.error('Erro ao atualizar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel atualizar a venda.' });
   }
