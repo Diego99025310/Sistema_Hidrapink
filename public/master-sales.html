@@ -18,23 +18,34 @@
       <section class="card">
         <h2>Importar vendas por período</h2>
         <p class="note">
-          Faça o upload do arquivo JSON exportado da plataforma, informe a data de referência do período e importaremos todas as
-          vendas dos cupons cadastrados. Depois da importação você ainda poderá editar cada registro individualmente.
+          Cole os dados exportados da plataforma (como a tabela de pedidos) ou, se preferir, faça o upload do arquivo JSON. Informe
+          a data de referência apenas quando o relatório não trouxer a data da venda. Após importar, você continua podendo editar
+          cada registro individualmente.
         </p>
         <form id="importSalesForm">
           <div class="form-grid compact">
             <label>
-              Data de referência*
-              <input id="importReferenceDate" name="referenceDate" type="date" required />
+              Data de referência
+              <input id="importReferenceDate" name="referenceDate" type="date" />
+              <span class="help-text">Usada quando os dados colados não tiverem data.</span>
+            </label>
+            <label class="full-width">
+              Cole as vendas aqui*
+              <textarea
+                id="importSalesText"
+                name="salesText"
+                rows="8"
+                placeholder="Ex.: Número do pedido, data do pagamento, valor, cupom"
+              ></textarea>
             </label>
             <label>
-              Arquivo JSON*
-              <input id="importSalesFile" name="salesFile" type="file" accept="application/json" required />
+              Arquivo JSON
+              <input id="importSalesFile" name="salesFile" type="file" accept="application/json" />
             </label>
           </div>
           <p class="note">
-            A data informada será aplicada a todas as vendas importadas. Você poderá ajustar a data diretamente no registro caso
-            precise de mais detalhes do período.
+            Dica: copie a tabela com as colunas Pedido, Data (Paid at), Valor (Subtotal) e Cupom (Discount Code). Quando o cupom
+            não estiver cadastrado, a linha aparecerá com alerta.
           </p>
           <div class="button-row">
             <button type="submit">Importar vendas</button>
@@ -47,9 +58,10 @@
           <table id="importPreviewTable">
             <thead>
               <tr>
+                <th>Pedido</th>
+                <th>Data</th>
                 <th>Cupom</th>
                 <th>Influenciadora</th>
-                <th>Pedidos</th>
                 <th>Bruto</th>
                 <th>Desconto</th>
                 <th>Liquido</th>

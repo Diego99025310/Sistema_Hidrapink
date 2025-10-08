@@ -1002,6 +1002,7 @@
     const importSalesForm = document.getElementById('importSalesForm');
     const importReferenceDateInput = document.getElementById('importReferenceDate');
     const importSalesFileInput = document.getElementById('importSalesFile');
+    const importSalesTextInput = document.getElementById('importSalesText');
     const importMessageEl = document.getElementById('importSalesMessage');
     const clearImportButton = document.getElementById('clearImportButton');
     const importPreviewWrapper = document.getElementById('importPreview');
@@ -1102,6 +1103,164 @@
       return Math.round(number);
     };
 
+    const parseDateFromText = (value) => {
+      if (value == null) return null;
+      const text = String(value).trim();
+      if (!text) return null;
+      const cleaned = text.replace(/[\u00A0\s]+/g, ' ').trim();
+      const isoMatch = cleaned.match(/(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
+      let year;
+      let month;
+      let day;
+      if (isoMatch) {
+        year = Number(isoMatch[1]);
+        month = Number(isoMatch[2]);
+        day = Number(isoMatch[3]);
+      } else {
+        const brMatch = cleaned.match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
+        if (!brMatch) return null;
+        day = Number(brMatch[1]);
+        month = Number(brMatch[2]);
+        year = Number(brMatch[3]);
+        if (year < 100) {
+          year += year >= 70 ? 1900 : 2000;
+        }
+      }
+
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (Number.isNaN(date.getTime())) return null;
+      if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null;
+      const pad = (num) => String(num).padStart(2, '0');
+      return `${String(year).padStart(4, '0')}-${pad(month)}-${pad(day)}`;
+    };
+
+    const formatDateForDisplay = (value) => {
+      if (!value) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        const [year, month, day] = text.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      const parsed = parseDateFromText(text);
+      if (parsed) {
+        const [year, month, day] = parsed.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      return text;
+    };
+
+    const normalizeHeaderKey = (value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+
+    const detectDelimiter = (line) => {
+      if (line.includes('\t')) return '\t';
+      if (line.includes(';')) return ';';
+      if ((line.match(/\|/g) || []).length >= 3) return '|';
+      const commaCount = (line.match(/,/g) || []).length;
+      const dotCount = (line.match(/\./g) || []).length;
+      if (commaCount >= 3 && commaCount > dotCount) return ',';
+      if (/\s{2,}/.test(line)) return /\s{2,}/;
+      return /\s+/;
+    };
+
+    const splitColumns = (line, delimiter) => {
+      if (delimiter === '\t' || typeof delimiter === 'string') {
+        return line.split(delimiter).map((cell) => cell.trim());
+      }
+      if (delimiter instanceof RegExp) {
+        return line.split(delimiter).map((cell) => cell.trim());
+      }
+      return [line.trim()];
+    };
+
+    const parsePastedSalesText = (text) => {
+      if (typeof text !== 'string') return [];
+      const normalizedText = text.replace(/\r\n?/g, '\n').split('\n');
+      const lines = normalizedText.map((line) => line.trim()).filter((line) => line);
+      if (!lines.length) return [];
+
+      let headerLine = lines[0];
+      let delimiter = detectDelimiter(headerLine);
+      let headerCells = splitColumns(headerLine, delimiter);
+      const headerTypes = headerCells.map((cell) => {
+        const key = normalizeHeaderKey(cell);
+        if (!key) return null;
+        if (['name', 'pedido', 'order', 'ordem', 'numero', 'orderid', 'ordercodigo', 'ordercode'].includes(key)) return 'order';
+        if (['paidat', 'data', 'date', 'pagamento', 'paymentdate', 'datapagamento'].includes(key)) return 'date';
+        if (['subtotal', 'valor', 'total', 'amount', 'gross', 'valorbruto', 'totalpedido'].includes(key)) return 'gross';
+        if (['discountcode', 'cupom', 'coupon', 'codigodesconto', 'codigocupom'].includes(key)) return 'coupon';
+        return null;
+      });
+
+      let dataLines = lines.slice(1);
+      let columnTypes = headerTypes;
+
+      if (headerTypes.filter(Boolean).length < 2) {
+        dataLines = lines;
+        headerLine = lines[0];
+        delimiter = detectDelimiter(headerLine);
+        headerCells = splitColumns(headerLine, delimiter);
+        columnTypes = headerCells.map((_, index) => {
+          const defaults = ['order', 'date', 'gross', 'coupon'];
+          return defaults[index] || null;
+        });
+      }
+
+      if (!dataLines.length) return [];
+      if (!columnTypes.length) {
+        delimiter = detectDelimiter(dataLines[0]);
+        const firstRow = splitColumns(dataLines[0], delimiter);
+        columnTypes = firstRow.map((_, index) => {
+          const defaults = ['order', 'date', 'gross', 'coupon'];
+          return defaults[index] || null;
+        });
+      }
+
+      const entries = [];
+      dataLines.forEach((line) => {
+        if (!line) return;
+        const cells = splitColumns(line, delimiter);
+        if (!cells.some((cell) => cell)) return;
+        const entry = {};
+        columnTypes.forEach((type, index) => {
+          if (!type) return;
+          const value = cells[index] ?? '';
+          if (!value && value !== 0) return;
+          if (type === 'order') {
+            entry.order = value;
+            entry.pedido = value;
+            entry.order_id = value;
+          } else if (type === 'date') {
+            entry.paid_at = value;
+            entry.date = value;
+            entry.data = value;
+          } else if (type === 'gross') {
+            entry.subtotal = value;
+            entry.gross_value = value;
+            entry.grossSales = value;
+            entry.gross = value;
+            entry.net_value = value;
+            entry.netSales = value;
+          } else if (type === 'coupon') {
+            entry.cupom = value;
+            entry.coupon = value;
+            entry.discount_code = value;
+            entry.coupon_code = value;
+          }
+        });
+        if (Object.keys(entry).length) {
+          entry.__source = { type: 'paste', rawLine: line };
+          entries.push(entry);
+        }
+      });
+      return entries;
+    };
+
     const extractArrayFromData = (data) => {
       if (Array.isArray(data)) return data;
       if (!data || typeof data !== 'object') return [];
@@ -1176,11 +1335,17 @@
         'net'
       ];
       const ordersKeys = ['orders', 'orders_with_discount', 'ordersWithDiscount', 'pedidos', 'total_orders', 'ordersApplied'];
+      const orderKeys = ['order', 'order_id', 'orderId', 'orderNumber', 'pedido', 'numero', 'pedido_id', 'numero_pedido', 'ordercode'];
+      const dateKeys = ['date', 'data', 'paid_at', 'paidAt', 'payment_date', 'datapagamento'];
 
       return entries.map((entry, index) => {
         const couponValue = findValueByKeys(entry, couponKeys);
         const coupon = couponValue != null ? String(couponValue).trim() : '';
         const influencer = getInfluencerByCoupon(coupon);
+
+        const orderValue = findValueByKeys(entry, orderKeys);
+        const rawDate = findValueByKeys(entry, dateKeys);
+        const parsedDate = parseDateFromText(rawDate);
 
         let grossValue = parseNumeric(findValueByKeys(entry, grossKeys));
         let discount = parseNumeric(findValueByKeys(entry, discountKeys));
@@ -1228,13 +1393,17 @@
           cupom: coupon,
           influencerId: influencer?.id || null,
           influencerName: influencer?.nome || '',
+          orderCode: orderValue != null ? String(orderValue).trim() : '',
+          rawDate: rawDate != null ? String(rawDate).trim() : '',
+          date: parsedDate,
           grossValue,
           discount,
           netValue,
           orders: Number.isFinite(orders) ? Math.max(0, orders) : null,
           canImport: Boolean(influencer && coupon && grossValue != null),
           status: 'ready',
-          statusMessage: 'Pronto para importação'
+          statusMessage: 'Pronto para importação',
+          sourceType: entry?.__source?.type || 'file'
         };
 
         if (!coupon) {
@@ -1272,10 +1441,16 @@
       rows.forEach((row) => {
         const tr = document.createElement('tr');
         tr.dataset.status = row.status || 'ready';
+        const dateLabel = row.effectiveDate
+          ? formatDateForDisplay(row.effectiveDate)
+          : row.rawDate
+          ? formatDateForDisplay(row.rawDate)
+          : '-';
         const columns = [
+          row.orderCode || '-',
+          dateLabel || '-',
           row.cupom || '-',
           row.influencerName || '-',
-          row.orders != null ? String(row.orders) : '-',
           row.grossValue != null ? formatCurrency(row.grossValue) : '-',
           formatCurrency(row.discount || 0),
           row.netValue != null ? formatCurrency(row.netValue) : '-',
@@ -1338,6 +1513,7 @@
       hideElement(importSummaryEl);
       hideElement(importPreviewWrapper);
       if (importSalesFileInput) importSalesFileInput.value = '';
+      if (importSalesTextInput) importSalesTextInput.value = '';
       if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';
     };
 
@@ -1367,12 +1543,17 @@
 
       const referenceDate = importReferenceDateInput?.value || '';
       const file = importSalesFileInput?.files?.[0] || null;
+      const pastedText = importSalesTextInput?.value?.trim() || '';
+      const hasFile = Boolean(file);
+      const hasPastedText = Boolean(pastedText);
 
-      flagInvalidField(importReferenceDateInput, Boolean(referenceDate));
-      flagInvalidField(importSalesFileInput, Boolean(file));
+      flagInvalidField(importSalesTextInput, hasPastedText || hasFile);
+      flagInvalidField(importSalesFileInput, hasFile || hasPastedText);
+      if (importReferenceDateInput) importReferenceDateInput.removeAttribute('aria-invalid');
 
-      if (!referenceDate || !file) {
-        setMessage(importMessageEl, 'Informe a data e selecione o arquivo JSON para importar.', 'error');
+      if (!hasFile && !hasPastedText) {
+        setMessage(importMessageEl, 'Cole as vendas ou selecione um arquivo JSON para importar.', 'error');
+        focusFirstInvalidField(importSalesForm);
         return;
       }
 
@@ -1386,23 +1567,40 @@
       }
 
       setFormBusy(importSalesForm, true);
-      setMessage(importMessageEl, 'Lendo arquivo e preparando as vendas...', 'info');
+      const processingMessage = hasFile && hasPastedText
+        ? 'Processando dados colados e arquivo selecionado...'
+        : hasFile
+        ? 'Lendo arquivo e preparando as vendas...'
+        : 'Processando dados colados...';
+      setMessage(importMessageEl, processingMessage, 'info');
 
       try {
-        const fileContent = await readFileAsText(file);
-        let parsed;
-        try {
-          parsed = JSON.parse(fileContent);
-        } catch (parseError) {
-          throw new Error('O arquivo selecionado não contém um JSON válido.');
+        let rawEntries = [];
+        if (hasPastedText) {
+          rawEntries = rawEntries.concat(parsePastedSalesText(pastedText));
+        }
+        if (hasFile) {
+          const fileContent = await readFileAsText(file);
+          let parsed;
+          try {
+            parsed = JSON.parse(fileContent);
+          } catch (parseError) {
+            throw new Error('O arquivo selecionado não contém um JSON válido.');
+          }
+          rawEntries = rawEntries.concat(extractArrayFromData(parsed));
         }
 
-        const rawEntries = extractArrayFromData(parsed);
         if (!rawEntries.length) {
-          throw new Error('Nenhuma venda foi encontrada no arquivo informado.');
+          throw new Error('Nenhuma venda foi encontrada nos dados informados.');
         }
 
         const normalizedEntries = normalizeImportEntries(rawEntries);
+
+        const needsReferenceDate = normalizedEntries.some((item) => !item.date);
+        if (needsReferenceDate && !referenceDate) {
+          flagInvalidField(importReferenceDateInput, false);
+        }
+
         normalizedEntries
           .filter((item) => item.status === 'warning' && !item.canImport)
           .forEach((item) => {
@@ -1410,9 +1608,19 @@
             item.statusMessage = 'Cupom não cadastrado. Cadastre-o e tente novamente.';
           });
 
+        normalizedEntries.forEach((item) => {
+          const effectiveDate = item.date || referenceDate || '';
+          item.effectiveDate = effectiveDate;
+          if (!effectiveDate && item.canImport) {
+            item.status = 'error';
+            item.statusMessage = 'Informe a data no relatório ou selecione uma data de referência.';
+            item.canImport = false;
+          }
+        });
+
         renderImportPreview(normalizedEntries);
 
-        const importableEntries = normalizedEntries.filter((item) => item.canImport);
+        const importableEntries = normalizedEntries.filter((item) => item.canImport && item.effectiveDate);
 
         if (!importableEntries.length) {
           setMessage(
@@ -1434,7 +1642,7 @@
               method: 'POST',
               body: {
                 cupom: item.cupom,
-                date: referenceDate,
+                date: item.effectiveDate,
                 grossValue: item.grossValue,
                 discount: item.discount || 0
               }
@@ -1458,6 +1666,9 @@
         if (importSalesFileInput) {
           importSalesFileInput.value = '';
         }
+        if (importSalesTextInput) {
+          importSalesTextInput.value = '';
+        }
 
         if (successCount && !failureCount) {
           setMessage(importMessageEl, `Importação concluída com ${successCount} vendas.`, 'success');
@@ -1468,7 +1679,7 @@
             'info'
           );
         } else {
-          setMessage(importMessageEl, 'Nenhuma venda foi importada. Verifique o arquivo e tente novamente.', 'error');
+          setMessage(importMessageEl, 'Nenhuma venda foi importada. Verifique os dados e tente novamente.', 'error');
         }
 
         if (successCount && currentSalesInfluencerId) {
@@ -1476,7 +1687,7 @@
           setMessage(messageEl, 'Vendas atualizadas após importação.', 'success');
         }
       } catch (error) {
-        setMessage(importMessageEl, error.message || 'Não foi possível processar o arquivo informado.', 'error');
+        setMessage(importMessageEl, error.message || 'Não foi possível processar os dados informados.', 'error');
         hideElement(importSummaryEl);
         hideElement(importPreviewWrapper);
         if (importPreviewTableBody) importPreviewTableBody.innerHTML = '';

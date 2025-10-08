@@ -166,6 +166,13 @@ label {
   color: var(--text-primary);
 }
 
+.help-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 input,
 select,
 textarea {
@@ -576,6 +583,10 @@ input[type='file']::file-selector-button:focus {
 
 .form-grid.compact {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.form-grid .full-width {
+  grid-column: 1 / -1;
 }
 
 .credentials-group {
