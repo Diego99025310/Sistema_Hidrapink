@@ -23,6 +23,7 @@
         </div>
         <form id="createSaleForm">
           <div class="form-grid compact">
+            <label>Pedido*<input name="orderNumber" type="text" required /></label>
             <label>
               Cupom*
               <select name="saleCoupon" id="saleCouponSelect" required>
@@ -52,12 +53,13 @@
           <table id="salesTable">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Pedido</th>
                 <th>Cupom</th>
-                <th>Bruto</th>
+                <th>Data</th>
+                <th>Valor bruto</th>
                 <th>Desconto</th>
-                <th>Liquido</th>
-                <th>Comissao</th>
+                <th>Valor liquido</th>
+                <th>Comissão</th>
                 <th>Acoes</th>
               </tr>
             </thead>
