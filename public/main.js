@@ -1676,38 +1676,38 @@
     const locationValue = locationParts.length ? locationParts.join(' / ') : '-';
 
     const items = [
-      ['Nome', data.nome],
-      ['Instagram', instagramValue],
-      ['E-mail', emailValue],
-      ['Contato', contactValue],
-      ['Cupom', data.cupom],
-      [
-        'Link',
-        data.discountLink && data.discountLink !== '-'
-          ? {
-              type: 'link',
-              url: data.discountLink,
-              label: data.discountLink
-            }
-          : '-'
-      ],
-      ['E-mail', emailValue],
-      ['Contato', contactValue],
-      ['Instagram', instagramValue],
-      ['Comissão', data.commissionPercent],
-      ['Login de acesso', loginEmailValue],
-      ['Localização', locationValue],
-      ['Endereço', addressValue],
-      ['Complemento', data.complemento],
-      ['Bairro', data.bairro],
-      ['CEP', data.cep]
+      {
+        key: 'nome',
+        label: 'Nome',
+        value: data.nome
+      },
+      {
+        key: 'cupom',
+        label: 'Cupom',
+        value: data.cupom
+      },
+      {
+        key: 'link',
+        label: 'Link',
+        value:
+          data.discountLink && data.discountLink !== '-'
+            ? {
+                type: 'link',
+                url: data.discountLink,
+                label: data.discountLink
+              }
+            : '-'
+      }
     ];
 
     const fragment = document.createDocumentFragment();
 
-    items.forEach(([label, value]) => {
+    items.forEach(({ key, label, value }) => {
       const item = document.createElement('div');
       item.className = 'info-item';
+      if (key) {
+        item.dataset.field = key;
+      }
 
       const labelEl = document.createElement('span');
       labelEl.className = 'info-label';

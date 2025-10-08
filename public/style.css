@@ -505,6 +505,12 @@ body[data-page='influencer'] .influencer-details-card .info-item {
   box-shadow: none;
 }
 
+body[data-page='influencer']
+  .influencer-details-card
+  .info-item:not([data-field='nome']):not([data-field='cupom']):not([data-field='link']) {
+  display: none !important;
+}
+
 body[data-page='influencer'] .influencer-details-card .info-label {
   font-size: 1rem;
   letter-spacing: normal;
