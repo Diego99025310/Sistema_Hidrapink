@@ -9,33 +9,20 @@
   </head>
   <body data-page="influencer">
     <div class="container" id="influencerPage">
-      <header class="page-hero">
-        <div class="hero-text">
-          <h1>Bem-vinda, Pinklover!</h1>
-          <p>Acompanhe seus dados e desempenho em um painel inspirado no master.</p>
-        </div>
-        <button type="button" data-action="logout">Sair</button>
+      <header class="page-hero influencer-hero">
+        <h1 id="influencerGreeting">Bem vinda, Pinklover.</h1>
       </header>
 
-      <main class="dashboard-grid">
-        <section class="card" aria-labelledby="influencer-info-title">
-          <div class="card-heading">
-            <h2 id="influencer-info-title">Seus dados principais</h2>
-            <p class="card-subtitle">Confira e compartilhe facilmente seus principais dados de cadastro.</p>
-          </div>
-          <div id="influencerDetails" class="info-grid"></div>
+      <main class="dashboard-grid influencer-layout">
+        <section class="card influencer-details-card" aria-labelledby="influencer-info-title">
+          <h2 id="influencer-info-title" class="visually-hidden">Dados da influenciadora</h2>
           <div id="influencerMessage" class="message" aria-live="polite"></div>
+          <div id="influencerDetails" class="info-grid"></div>
         </section>
 
-        <section class="card" aria-labelledby="influencer-sales-title">
-          <div class="card-heading">
-            <h2 id="influencer-sales-title">Desempenho em vendas</h2>
-            <p class="card-subtitle">Veja o histórico de vendas registradas com seus cupons.</p>
-          </div>
-          <div class="sales-summary-wrapper">
-            <div id="influencerSalesSummary" class="influencer-summary"></div>
-            <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
-          </div>
+        <section class="card influencer-history-card" aria-labelledby="influencer-sales-title">
+          <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
+          <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
           <div class="table-wrapper">
             <table id="influencerSalesTable">
               <thead>

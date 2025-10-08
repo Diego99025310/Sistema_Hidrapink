@@ -461,20 +461,8 @@
     const discountLink = coupon ? `https://www.hidrapink.com.br/discount/${encodeURIComponent(coupon)}` : '';
     return {
       nome: data.nome || '-',
-      instagram: data.instagram || '-',
-      email: data.email || '-',
-      contato: data.contato || '-',
       cupom: coupon || '-',
-      commissionPercent: data.commission_rate != null ? formatPercentage(data.commission_rate) : '-',
-      cep: data.cep || '-',
-      logradouro: data.logradouro || '-',
-      numero: data.numero || '-',
-      complemento: data.complemento || '-',
-      bairro: data.bairro || '-',
-      cidade: data.cidade || '-',
-      estado: data.estado || '-',
-      loginEmail: data.login_email || data.loginEmail || '-',
-      discountLink
+      discountLink: discountLink || '-'
     };
   };
 
@@ -1742,8 +1730,8 @@
       ['Contato', contactValue],
       ['Cupom', data.cupom],
       [
-        'Link de desconto',
-        data.discountLink
+        'Link',
+        data.discountLink && data.discountLink !== '-'
           ? {
               type: 'copy-link',
               url: data.discountLink,
@@ -1792,10 +1780,10 @@
 
     const detailsEl = document.getElementById('influencerDetails');
     const messageEl = document.getElementById('influencerMessage');
+    const greetingEl = document.getElementById('influencerGreeting');
 
     const salesMessageEl = document.getElementById('influencerSalesMessage');
     const salesTableBody = document.querySelector('#influencerSalesTable tbody');
-    const salesSummaryEl = document.getElementById('influencerSalesSummary');
 
     const renderSalesTable = (rows) => {
       if (!salesTableBody) return;
@@ -1837,75 +1825,10 @@
       salesTableBody.appendChild(fragment);
     };
 
-    const createInfluencerSummaryMetric = (label, value, helper) => {
-      const metric = document.createElement('div');
-      metric.className = 'influencer-summary-item';
-
-      const labelEl = document.createElement('span');
-      labelEl.className = 'influencer-summary-label';
-      labelEl.textContent = label;
-      metric.appendChild(labelEl);
-
-      const valueEl = document.createElement('strong');
-      valueEl.textContent = value;
-      metric.appendChild(valueEl);
-
-      if (helper) {
-        const helperEl = document.createElement('span');
-        helperEl.className = 'influencer-summary-helper';
-        helperEl.textContent = helper;
-        metric.appendChild(helperEl);
-      }
-
-      return metric;
-    };
-
-    const renderSalesSummary = (summary, { totalSales = 0 } = {}) => {
-      if (!salesSummaryEl) return;
-      salesSummaryEl.innerHTML = '';
-
-      let safeTotalSales = Number(totalSales);
-      if (!Number.isFinite(safeTotalSales) || safeTotalSales < 0) {
-        safeTotalSales = 0;
-      }
-
-      const card = document.createElement('div');
-      card.className = 'influencer-summary-card';
-
-      const metricsWrapper = document.createElement('div');
-      metricsWrapper.className = 'influencer-summary-metrics';
-
-      const totalSalesHelper =
-        safeTotalSales === 0
-          ? 'Nenhuma venda registrada ainda.'
-          : `Total de ${formatInteger(safeTotalSales)} ${safeTotalSales === 1 ? 'venda registrada' : 'vendas registradas'} com seus cupons.`;
-
-      metricsWrapper.appendChild(
-        createInfluencerSummaryMetric('Total em vendas', formatCurrency(summary?.total_net ?? 0), totalSalesHelper)
-      );
-
-      metricsWrapper.appendChild(
-        createInfluencerSummaryMetric(
-          'Sua comissão',
-          formatCurrency(summary?.total_commission ?? 0)
-        )
-      );
-
-      card.appendChild(metricsWrapper);
-
-      const helperText = document.createElement('p');
-      helperText.className = 'influencer-summary-footer';
-      helperText.textContent = safeTotalSales
-        ? 'Resumo atualizado com sucesso.'
-        : 'Assim que suas vendas forem registradas aqui, o resumo aparecerá automaticamente.';
-      card.appendChild(helperText);
-      salesSummaryEl.appendChild(card);
-    };
-
     const loadInfluencerSales = async (influencerId) => {
       if (!influencerId) {
         renderSalesTable([]);
-        renderSalesSummary(null, { totalSales: 0 });
+        setMessage(salesMessageEl, '', '');
         return;
       }
       setMessage(salesMessageEl, 'Carregando vendas...', 'info');
@@ -1913,22 +1836,7 @@
         const salesData = await apiFetch(`/sales/${influencerId}`);
         const rows = Array.isArray(salesData) ? salesData : [];
         renderSalesTable(rows);
-        const totalSales = rows.length;
-        try {
-          const summaryData = await apiFetch(`/sales/summary/${influencerId}`);
-          renderSalesSummary(summaryData, { totalSales });
-        } catch (summaryError) {
-          if (summaryError.status === 401) {
-            logout();
-            return;
-          }
-          renderSalesSummary(null, { totalSales });
-        }
-        if (!totalSales) {
-          setMessage(salesMessageEl, '', '');
-        } else {
-          setMessage(salesMessageEl, 'Vendas atualizadas com sucesso.', 'success');
-        }
+        setMessage(salesMessageEl, '', '');
       } catch (error) {
         if (error.status === 401) {
           logout();
@@ -1936,7 +1844,6 @@
         }
         setMessage(salesMessageEl, error.message || 'Nao foi possivel carregar as vendas.', 'error');
         renderSalesTable([]);
-        renderSalesSummary(null, { totalSales: 0 });
       }
     };
 
@@ -1949,11 +1856,18 @@
           setMessage(messageEl, 'Nenhum registro associado ao seu usuario.', 'info');
           renderInfluencerDetails(detailsEl, null);
           renderSalesTable([]);
-          renderSalesSummary(null, { totalSales: 0 });
+          setMessage(salesMessageEl, '', '');
+          if (greetingEl) {
+            greetingEl.textContent = 'Bem vinda, Pinklover.';
+          }
           return;
         }
         renderInfluencerDetails(detailsEl, formatInfluencerDetails(influencer));
-        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover!', 'success');
+        if (greetingEl) {
+          const safeName = (influencer.nome || '').trim() || 'Pinklover';
+          greetingEl.textContent = `Bem vinda, ${safeName}.`;
+        }
+        setMessage(messageEl, '', '');
         loadInfluencerSales(influencer.id);
       } catch (error) {
         if (error.status === 401) {
@@ -1961,6 +1875,9 @@
           return;
         }
         setMessage(messageEl, error.message || 'Nao foi possivel carregar os dados.', 'error');
+        if (greetingEl) {
+          greetingEl.textContent = 'Bem vinda, Pinklover.';
+        }
       }
     };
 
