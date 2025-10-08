@@ -217,6 +217,7 @@ if (client === 'mysql') {
     await db.exec(`
       CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        order_code VARCHAR(100) NULL,
         influencer_id INT NOT NULL,
         date DATE NOT NULL,
         gross_value DECIMAL(12,2) NOT NULL CHECK (gross_value >= 0),
@@ -229,6 +230,13 @@ if (client === 'mysql') {
         INDEX idx_sales_influencer (influencer_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    await db.exec('ALTER TABLE sales ADD COLUMN IF NOT EXISTS order_code VARCHAR(100) NULL;').catch((error) => {
+      if (!error || error.code !== 'ER_DUP_FIELDNAME') throw error;
+    });
+    await db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_order_code ON sales(order_code);').catch((error) => {
+      if (!error || error.code !== 'ER_DUP_KEYNAME') throw error;
+    });
 
     await db.exec(`
       CREATE TABLE IF NOT EXISTS password_resets (
@@ -273,17 +281,40 @@ if (client === 'mysql') {
 
   module.exports = db;
 } else {
-  const Database = require('better-sqlite3');
+  const buildSqliteDriverError = (error) => {
+    const guidance = [
+      'Nao foi possivel carregar o driver SQLite (better-sqlite3).',
+      `Versao do Node.js detectada: ${process.versions?.node || 'desconhecida'}.`,
+      'Reinstale as dependencias com "npm install" utilizando esta mesma versao do Node ou remova a pasta node_modules antes de reinstalar.',
+      'Caso esteja utilizando uma versao antiga do Node (como 12.x ou 14.x), atualize para uma versao suportada ou garanta que o pacote better-sqlite3 foi reinstalado para essa versao.'
+    ];
+
+    const detailed = new Error(`${guidance.join('\n')}${error?.message ? `\n\nErro original: ${error.message}` : ''}`);
+    detailed.cause = error;
+    return detailed;
+  };
+
+  let Database;
+  try {
+    Database = require('better-sqlite3');
+  } catch (error) {
+    throw buildSqliteDriverError(error);
+  }
 
   const resolveDatabasePath = () => {
     if (process.env.DATABASE_PATH) {
       return path.resolve(process.env.DATABASE_PATH);
     }
-    return path.join(__dirname, '..', 'database.sqlite');
+    return path.join(__dirname, '..', 'meu_banco.sqlite');
   };
 
   const dbPath = resolveDatabasePath();
-  const db = new Database(dbPath);
+  let db;
+  try {
+    db = new Database(dbPath);
+  } catch (error) {
+    throw buildSqliteDriverError(error);
+  }
 
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -469,6 +500,7 @@ if (client === 'mysql') {
   const createSalesTable = (tableName = 'sales') => `
     CREATE TABLE ${tableName} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_code TEXT,
       influencer_id INTEGER NOT NULL,
       date TEXT NOT NULL,
       gross_value REAL NOT NULL CHECK (gross_value >= 0),
@@ -484,7 +516,15 @@ if (client === 'mysql') {
     const tableInfo = db.prepare('PRAGMA table_info(sales)').all();
     if (!tableInfo.length) {
       db.exec(createSalesTable());
+    } else {
+      const hasOrderCode = tableInfo.some((column) => column.name === 'order_code');
+      if (!hasOrderCode) {
+        db.exec('ALTER TABLE sales ADD COLUMN order_code TEXT;');
+      }
     }
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_order_code ON sales(order_code COLLATE NOCASE) WHERE order_code IS NOT NULL;"
+    );
   };
 
   const ensurePasswordResetsTable = () => {
