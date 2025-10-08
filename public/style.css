@@ -215,6 +215,14 @@ textarea[aria-invalid='true'] {
   gap: 14px;
 }
 
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 button {
   border: none;
   border-radius: var(--radius-md);
@@ -246,6 +254,14 @@ button.secondary-button {
 button.secondary-button:hover,
 button.secondary-button:focus {
   background: rgba(251, 211, 219, 0.55);
+}
+
+button:disabled,
+button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 [data-action='logout'] {

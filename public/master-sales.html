@@ -18,17 +18,11 @@
       <section class="card">
         <h2>Importar vendas por período</h2>
         <p class="note">
-          Cole os dados exportados da plataforma (como a tabela de pedidos) ou, se preferir, faça o upload do arquivo JSON. Informe
-          a data de referência apenas quando o relatório não trouxer a data da venda. Após importar, você continua podendo editar
-          cada registro individualmente.
+          Cole os dados exportados da plataforma (como a tabela de pedidos) ou, se preferir, faça o upload do arquivo JSON. Após
+          importar, você continua podendo editar cada registro individualmente.
         </p>
         <form id="importSalesForm">
           <div class="form-grid compact">
-            <label>
-              Data de referência
-              <input id="importReferenceDate" name="referenceDate" type="date" />
-              <span class="help-text">Usada quando os dados colados não tiverem data.</span>
-            </label>
             <label class="full-width">
               Cole as vendas aqui*
               <textarea
@@ -54,6 +48,10 @@
         </form>
         <div id="importSalesMessage" class="message" aria-live="polite"></div>
         <div id="importSummary" class="summary hidden" aria-live="polite"></div>
+        <div id="importActionButtons" class="import-actions hidden">
+          <button type="button" id="saveImportButton">Salvar importação</button>
+          <button type="button" class="secondary-button" id="cancelImportButton">Cancelar</button>
+        </div>
         <div id="importPreview" class="table-wrapper hidden" aria-live="polite">
           <table id="importPreviewTable">
             <thead>
@@ -87,6 +85,10 @@
                 <option value="">Selecione um cupom</option>
               </select>
             </label>
+            <label>
+              Pedido
+              <input name="orderCode" type="text" placeholder="Ex.: #1040" />
+            </label>
             <label>Data*<input name="saleDate" type="date" required /></label>
             <label>Valor bruto*<input name="grossValue" type="number" min="0" step="0.01" required /></label>
             <label>Desconto<input name="discountValue" type="number" min="0" step="0.01" /></label>
@@ -110,6 +112,7 @@
           <table id="salesTable">
             <thead>
               <tr>
+                <th>Pedido</th>
                 <th>Data</th>
                 <th>Cupom</th>
                 <th>Bruto</th>

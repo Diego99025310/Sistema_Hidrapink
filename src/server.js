@@ -148,6 +148,7 @@ const findInfluencerByCouponStmt = db.prepare(`${influencerBaseQuery} WHERE i.cu
 
 const insertSaleStmt = db.prepare(`
   INSERT INTO sales (
+    order_code,
     influencer_id,
     date,
     gross_value,
@@ -155,6 +156,7 @@ const insertSaleStmt = db.prepare(`
     net_value,
     commission
   ) VALUES (
+    @order_code,
     @influencer_id,
     @date,
     @gross_value,
@@ -166,6 +168,7 @@ const insertSaleStmt = db.prepare(`
 
 const updateSaleStmt = db.prepare(`
   UPDATE sales SET
+    order_code = @order_code,
     influencer_id = @influencer_id,
     date = @date,
     gross_value = @gross_value,
@@ -178,6 +181,7 @@ const updateSaleStmt = db.prepare(`
 const deleteSaleStmt = db.prepare('DELETE FROM sales WHERE id = ?');
 const findSaleByIdStmt = db.prepare(`
   SELECT s.id,
+         s.order_code,
          s.influencer_id,
          s.date,
          s.gross_value,
@@ -194,6 +198,7 @@ const findSaleByIdStmt = db.prepare(`
 `);
 const listSalesByInfluencerStmt = db.prepare(`
   SELECT s.id,
+         s.order_code,
          s.influencer_id,
          s.date,
          s.gross_value,
@@ -208,6 +213,16 @@ const listSalesByInfluencerStmt = db.prepare(`
   JOIN influenciadoras i ON i.id = s.influencer_id
   WHERE s.influencer_id = ?
   ORDER BY s.date DESC, s.id DESC
+`);
+const findSaleByOrderCodeStmt = db.prepare(`
+  SELECT s.id,
+         s.order_code,
+         s.date,
+         i.cupom
+  FROM sales s
+  JOIN influenciadoras i ON i.id = s.influencer_id
+  WHERE LOWER(s.order_code) = LOWER(?)
+  LIMIT 1
 `);
 const salesSummaryStmt = db.prepare('SELECT COALESCE(SUM(net_value), 0) AS total_net, COALESCE(SUM(commission), 0) AS total_commission FROM sales WHERE influencer_id = ?');
 const listInfluencerSummaryStmt = db.prepare(`
@@ -297,6 +312,22 @@ const authorizeMaster = (req, res, next) => {
 };
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : value);
+const normalizeOrderCode = (value) => {
+  const trimmed = trimString(value);
+  if (!trimmed) return null;
+  return String(trimmed).toUpperCase();
+};
+
+const isOrderCodeConstraintError = (error) => {
+  if (!error) return false;
+  if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.code === 'SQLITE_CONSTRAINT') {
+    return typeof error.message === 'string' && error.message.includes('idx_sales_order_code');
+  }
+  if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+    return true;
+  }
+  return false;
+};
 
 const normalizeInfluencerPayload = (body) => {
   const normalized = {
@@ -424,6 +455,7 @@ const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
 
 const formatSaleRow = (row) => ({
   id: row.id,
+  order_code: row.order_code || null,
   influencer_id: row.influencer_id,
   cupom: row.cupom || null,
   nome: row.nome || null,
@@ -471,6 +503,10 @@ const ensureInfluencerAccess = (req, influencerId) => {
 const normalizeSaleBody = (body) => {
   const cupom = trimString(body?.cupom);
   const date = trimString(body?.date);
+  const orderCodeNormalized = normalizeOrderCode(
+    body?.orderCode ?? body?.order_code ?? body?.pedido ?? body?.order
+  );
+  const orderCode = orderCodeNormalized ? orderCodeNormalized.slice(0, 100) : null;
   const grossRaw = body?.grossValue ?? body?.gross_value;
   const discountRaw = body?.discount ?? body?.discountValue ?? body?.discount_value ?? 0;
 
@@ -499,6 +535,7 @@ const normalizeSaleBody = (body) => {
     data: {
       cupom,
       date,
+      orderCode,
       grossValue: grossParsed.value,
       discount: discountParsed.value
     }
@@ -696,6 +733,7 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
 
   try {
     const result = insertSaleStmt.run({
+      order_code: data.orderCode,
       influencer_id: influencer.id,
       date: data.date,
       gross_value: data.grossValue,
@@ -706,8 +744,42 @@ app.post('/sales', authenticate, authorizeMaster, (req, res) => {
     const created = findSaleByIdStmt.get(result.lastInsertRowid);
     return res.status(201).json(formatSaleRow(created));
   } catch (err) {
+    if (isOrderCodeConstraintError(err)) {
+      return res.status(409).json({ error: 'Pedido já cadastrado.' });
+    }
     console.error('Erro ao cadastrar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a venda.' });
+  }
+});
+
+app.post('/sales/check-orders', authenticate, authorizeMaster, async (req, res) => {
+  const orders = Array.isArray(req.body?.orders) ? req.body.orders : [];
+  if (!orders.length) {
+    return res.status(200).json([]);
+  }
+
+  const unique = Array.from(new Set(orders.map(normalizeOrderCode).filter(Boolean)));
+  if (!unique.length) {
+    return res.status(200).json([]);
+  }
+
+  try {
+    const results = [];
+    for (const code of unique) {
+      const sale = await findSaleByOrderCodeStmt.get(code);
+      if (sale) {
+        results.push({
+          sale_id: sale.id,
+          order_code: sale.order_code,
+          date: sale.date,
+          cupom: sale.cupom
+        });
+      }
+    }
+    return res.status(200).json(results);
+  } catch (error) {
+    console.error('Erro ao verificar pedidos:', error);
+    return res.status(500).json({ error: 'Nao foi possivel verificar os pedidos.' });
   }
 });
 
@@ -736,6 +808,7 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
 
   try {
     updateSaleStmt.run({
+      order_code: data.orderCode,
       id: saleId,
       influencer_id: influencer.id,
       date: data.date,
@@ -748,6 +821,9 @@ app.put('/sales/:id', authenticate, authorizeMaster, (req, res) => {
     const updated = findSaleByIdStmt.get(saleId);
     return res.status(200).json(formatSaleRow(updated));
   } catch (err) {
+    if (isOrderCodeConstraintError(err)) {
+      return res.status(409).json({ error: 'Pedido já cadastrado.' });
+    }
     console.error('Erro ao atualizar venda:', err);
     return res.status(500).json({ error: 'Nao foi possivel atualizar a venda.' });
   }
