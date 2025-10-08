@@ -81,6 +81,12 @@
     return currencyFormatter.format(Number.isFinite(number) ? number : 0);
   };
 
+  const integerFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  const formatInteger = (value) => {
+    const number = Number(value);
+    return integerFormatter.format(Number.isFinite(number) ? number : 0);
+  };
+
   const formatDateToBR = (value) => {
     if (!value) return '-';
     const iso = String(value).split('T')[0];
@@ -95,6 +101,93 @@
     const number = Number(value);
     if (!Number.isFinite(number)) return '-';
     return `${number.toFixed(2)}%`;
+  };
+
+  const createSummaryItemElement = ({ label, value, helper, icon = 'info' }) => {
+    const item = document.createElement('div');
+    item.className = 'summary-item';
+
+    const iconEl = document.createElement('span');
+    iconEl.className = `summary-icon summary-icon--${icon}`;
+    item.appendChild(iconEl);
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'summary-content';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'summary-label';
+    labelEl.textContent = label;
+    contentEl.appendChild(labelEl);
+
+    const valueEl = document.createElement('strong');
+    valueEl.className = 'summary-value';
+    valueEl.textContent = value;
+    contentEl.appendChild(valueEl);
+
+    if (helper) {
+      const helperEl = document.createElement('span');
+      helperEl.className = 'summary-helper';
+      helperEl.textContent = helper;
+      contentEl.appendChild(helperEl);
+    }
+
+    item.appendChild(contentEl);
+    return item;
+  };
+
+  const renderSummaryMetrics = (container, metrics = []) => {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!Array.isArray(metrics) || metrics.length === 0) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    metrics.forEach((metric) => {
+      fragment.appendChild(createSummaryItemElement(metric));
+    });
+    container.appendChild(fragment);
+  };
+
+  const buildSalesSummaryMetrics = (summary, totalSales = 0) => {
+    let safeTotalSales = Number(totalSales);
+    if (!Number.isFinite(safeTotalSales) || safeTotalSales < 0) {
+      safeTotalSales = 0;
+    }
+
+    const salesHelper =
+      safeTotalSales === 0
+        ? 'Nenhuma venda registrada ainda'
+        : safeTotalSales === 1
+        ? 'venda concluída'
+        : 'vendas concluídas';
+
+    const metrics = [
+      {
+        label: 'Pedidos registrados',
+        value: formatInteger(safeTotalSales),
+        helper: salesHelper,
+        icon: 'orders'
+      }
+    ];
+
+    if (summary) {
+      metrics.push(
+        {
+          label: 'Total em vendas',
+          value: formatCurrency(summary.total_net),
+          helper: 'Valor líquido acumulado',
+          icon: 'revenue'
+        },
+        {
+          label: 'Sua comissão',
+          value: formatCurrency(summary.total_commission),
+          helper: 'Estimativa atual',
+          icon: 'commission'
+        }
+      );
+    }
+
+    return metrics;
   };
 
   const session = {
@@ -368,20 +461,8 @@
     const discountLink = coupon ? `https://www.hidrapink.com.br/discount/${encodeURIComponent(coupon)}` : '';
     return {
       nome: data.nome || '-',
-      instagram: data.instagram || '-',
-      email: data.email || '-',
-      contato: data.contato || '-',
       cupom: coupon || '-',
-      commissionPercent: data.commission_rate != null ? formatPercentage(data.commission_rate) : '-',
-      cep: data.cep || '-',
-      logradouro: data.logradouro || '-',
-      numero: data.numero || '-',
-      complemento: data.complemento || '-',
-      bairro: data.bairro || '-',
-      cidade: data.cidade || '-',
-      estado: data.estado || '-',
-      loginEmail: data.login_email || data.loginEmail || '-',
-      discountLink
+      discountLink: discountLink || '-'
     };
   };
 
@@ -1088,18 +1169,12 @@
       salesTableBody.appendChild(fragment);
     };
 
-    const renderSalesSummary = (summary) => {
-      if (!salesSummaryEl) return;
-      if (!summary) {
-        salesSummaryEl.textContent = '';
-        return;
-      }
-      salesSummaryEl.innerHTML = '';
-      const totalNet = document.createElement('span');
-      totalNet.textContent = `Total em vendas: ${formatCurrency(summary.total_net)}`;
-      const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Sua comissão: ${formatCurrency(summary.total_commission)}`;
-      salesSummaryEl.append(totalNet, totalCommission);
+    const renderSalesSummary = (summary, { totalSales } = {}) => {
+      const metrics = buildSalesSummaryMetrics(
+        summary,
+        typeof totalSales === 'number' ? totalSales : Array.isArray(sales) ? sales.length : 0
+      );
+      renderSummaryMetrics(salesSummaryEl, metrics);
     };
 
     const updateImportConfirmState = () => {
@@ -1231,7 +1306,7 @@
       if (!influencerId) {
         sales = [];
         renderSalesTable();
-        renderSalesSummary(null);
+        renderSalesSummary(null, { totalSales: 0 });
         return;
       }
       if (showStatus) setMessage(messageEl, 'Carregando vendas...', 'info');
@@ -1241,13 +1316,13 @@
         renderSalesTable();
         try {
           const summary = await apiFetch(`/sales/summary/${influencerId}`);
-          renderSalesSummary(summary);
+          renderSalesSummary(summary, { totalSales: sales.length });
         } catch (summaryError) {
           if (summaryError.status === 401) {
             logout();
             return;
           }
-          renderSalesSummary(null);
+          renderSalesSummary(null, { totalSales: sales.length });
         }
         if (!sales.length) {
           if (showStatus) setMessage(messageEl, 'Nenhuma venda cadastrada para este cupom.', 'info');
@@ -1259,8 +1334,9 @@
           logout();
           return;
         }
-        renderSalesTable([]);
-        renderSalesSummary(null);
+        sales = [];
+        renderSalesTable();
+        renderSalesSummary(null, { totalSales: 0 });
         setMessage(messageEl, error.message || 'Nao foi possivel carregar as vendas.', 'error');
       }
     };
@@ -1296,7 +1372,7 @@
         currentSalesInfluencerId = null;
         sales = [];
         renderSalesTable();
-        renderSalesSummary(null);
+        renderSalesSummary(null, { totalSales: 0 });
         updateSaleComputedFields();
         setMessage(messageEl, 'Selecione um cupom para visualizar e registrar as vendas.', 'info');
         return;
@@ -1586,8 +1662,22 @@
     };
 
     const createValueElement = (value) => {
-      if (value && typeof value === 'object' && value.type === 'copy-link') {
-        return createCopyLinkElement(value);
+      if (value && typeof value === 'object') {
+        if (value.type === 'copy-link') {
+          return createCopyLinkElement(value);
+        }
+        if (value.type === 'link' && value.url) {
+          const anchor = document.createElement('a');
+          anchor.href = value.url;
+          anchor.className = 'detail-link';
+          anchor.classList.add('info-value');
+          anchor.textContent = value.label || value.url;
+          if (value.external !== false) {
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+          }
+          return anchor;
+        }
       }
       const el = document.createElement('span');
       el.className = 'info-value';
@@ -1600,7 +1690,7 @@
       ['Cupom', data.cupom],
       [
         'Link',
-        data.discountLink
+        data.discountLink && data.discountLink !== '-'
           ? {
               type: 'copy-link',
               url: data.discountLink,
@@ -1639,10 +1729,10 @@
 
     const detailsEl = document.getElementById('influencerDetails');
     const messageEl = document.getElementById('influencerMessage');
+    const greetingEl = document.getElementById('influencerGreeting');
 
     const salesMessageEl = document.getElementById('influencerSalesMessage');
     const salesTableBody = document.querySelector('#influencerSalesTable tbody');
-    const salesSummaryEl = document.getElementById('influencerSalesSummary');
 
     const renderSalesTable = (rows) => {
       if (!salesTableBody) return;
@@ -1667,10 +1757,16 @@
             ? formatCurrency(sale.net_value)
             : formatCurrency(sale.gross_value);
         const statusLabel = sale.status || sale.status_label || sale.statusLabel || 'Concluída';
-        const cells = [sale.date || '-', customerName, valueToDisplay, statusLabel];
-        cells.forEach((value) => {
+        const cells = [
+          { label: 'Data', value: sale.date || '-' },
+          { label: 'Cliente', value: customerName },
+          { label: 'Valor', value: valueToDisplay },
+          { label: 'Status', value: statusLabel }
+        ];
+        cells.forEach(({ label, value }) => {
           const td = document.createElement('td');
           td.textContent = value;
+          td.dataset.label = label;
           tr.appendChild(td);
         });
         fragment.appendChild(tr);
@@ -1678,45 +1774,18 @@
       salesTableBody.appendChild(fragment);
     };
 
-    const renderSalesSummary = (summary) => {
-      if (!salesSummaryEl) return;
-      if (!summary) {
-        salesSummaryEl.textContent = '';
-        return;
-      }
-      salesSummaryEl.innerHTML = '';
-      const totalNet = document.createElement('span');
-      totalNet.textContent = `Total em vendas: ${formatCurrency(summary.total_net)}`;
-      const totalCommission = document.createElement('span');
-      totalCommission.textContent = `Sua comissão: ${formatCurrency(summary.total_commission)}`;
-      salesSummaryEl.append(totalNet, totalCommission);
-    };
-
     const loadInfluencerSales = async (influencerId) => {
       if (!influencerId) {
         renderSalesTable([]);
-        renderSalesSummary(null);
+        setMessage(salesMessageEl, '', '');
         return;
       }
       setMessage(salesMessageEl, 'Carregando vendas...', 'info');
       try {
         const salesData = await apiFetch(`/sales/${influencerId}`);
-        renderSalesTable(Array.isArray(salesData) ? salesData : []);
-        try {
-          const summaryData = await apiFetch(`/sales/summary/${influencerId}`);
-          renderSalesSummary(summaryData);
-        } catch (summaryError) {
-          if (summaryError.status === 401) {
-            logout();
-            return;
-          }
-          renderSalesSummary(null);
-        }
-        if (!salesData?.length) {
-          setMessage(salesMessageEl, '', '');
-        } else {
-          setMessage(salesMessageEl, 'Vendas atualizadas com sucesso.', 'success');
-        }
+        const rows = Array.isArray(salesData) ? salesData : [];
+        renderSalesTable(rows);
+        setMessage(salesMessageEl, '', '');
       } catch (error) {
         if (error.status === 401) {
           logout();
@@ -1724,7 +1793,6 @@
         }
         setMessage(salesMessageEl, error.message || 'Nao foi possivel carregar as vendas.', 'error');
         renderSalesTable([]);
-        renderSalesSummary(null);
       }
     };
 
@@ -1737,11 +1805,18 @@
           setMessage(messageEl, 'Nenhum registro associado ao seu usuario.', 'info');
           renderInfluencerDetails(detailsEl, null);
           renderSalesTable([]);
-          renderSalesSummary(null);
+          setMessage(salesMessageEl, '', '');
+          if (greetingEl) {
+            greetingEl.textContent = 'Bem vinda, Pinklover.';
+          }
           return;
         }
         renderInfluencerDetails(detailsEl, formatInfluencerDetails(influencer));
-        setMessage(messageEl, 'Dados atualizados com sucesso, Pinklover! 💗', 'success');
+        if (greetingEl) {
+          const safeName = (influencer.nome || '').trim() || 'Pinklover';
+          greetingEl.textContent = `Bem vinda, ${safeName}.`;
+        }
+        setMessage(messageEl, '', '');
         loadInfluencerSales(influencer.id);
       } catch (error) {
         if (error.status === 401) {
@@ -1749,6 +1824,9 @@
           return;
         }
         setMessage(messageEl, error.message || 'Nao foi possivel carregar os dados.', 'error');
+        if (greetingEl) {
+          greetingEl.textContent = 'Bem vinda, Pinklover.';
+        }
       }
     };
 
