@@ -545,6 +545,58 @@ body[data-page='influencer'] .influencer-details-card .card-actions {
   margin-top: 12px;
 }
 
+body[data-page='influencer'] .influencer-contract-card {
+  display: grid;
+  gap: clamp(14px, 3vw, 22px);
+}
+
+body[data-page='influencer'] .influencer-contract-card .note {
+  margin: 0;
+}
+
+body[data-page='influencer'] .influencer-contract-card .info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+body[data-page='influencer'] .influencer-contract-card .info-item {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 177, 204, 0.4);
+  background: linear-gradient(135deg, rgba(255, 241, 248, 0.95), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 24px 48px rgba(255, 150, 190, 0.18);
+}
+
+body[data-page='influencer'] .influencer-contract-card .info-label {
+  color: rgba(102, 47, 73, 0.88);
+  font-size: 0.82rem;
+}
+
+body[data-page='influencer'] .influencer-contract-card .info-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+body[data-page='influencer'] #influencerContractInfo:empty {
+  display: none;
+}
+
+body[data-page='influencer'] .influencer-contract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+body[data-page='influencer'] .influencer-contract-card .message {
+  margin: 0;
+}
+
+body[data-page='influencer'] .influencer-contract-card button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
 body[data-page='influencer'] .button-logout {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 210, 230, 0.95));
   color: #e4447a;
@@ -1139,6 +1191,82 @@ button.copy-button.error {
   background: rgba(255, 255, 255, 0.85);
   cursor: text;
   user-select: all;
+}
+
+.contract-summary {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(228, 68, 122, 0.32);
+  background: rgba(255, 245, 247, 0.9);
+  display: grid;
+  gap: 14px;
+}
+
+.contract-summary[hidden] {
+  display: none;
+}
+
+.contract-summary__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.contract-summary__item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(228, 68, 122, 0.24);
+  box-shadow: 0 16px 28px rgba(228, 68, 122, 0.12);
+}
+
+.contract-summary__label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: rgba(102, 47, 73, 0.82);
+}
+
+.contract-summary__value {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.contract-summary code {
+  font-family: 'Fira Code', 'SFMono-Regular', 'Roboto Mono', monospace;
+  font-size: 0.88rem;
+  background: rgba(228, 68, 122, 0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-block;
+  word-break: break-all;
+}
+
+.contract-summary pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Fira Code', 'SFMono-Regular', 'Roboto Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.contract-summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contract-summary__actions button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 body[data-page='master-create'] #createInfluencerForm[data-mode='edit'] .credentials-group {

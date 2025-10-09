@@ -104,6 +104,79 @@
     return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.padStart(4, '0')}`;
   };
 
+  const formatDateTimeDetailed = (value) => {
+    if (!value) return '-';
+    if (typeof value === 'object' && (value.br || value.iso || value.raw || value.utc)) {
+      return value.br || value.iso || value.utc || value.raw || '-';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+    try {
+      return new Intl.DateTimeFormat('pt-BR', {
+        dateStyle: 'short',
+        timeStyle: 'medium',
+        hour12: false,
+        timeZone: 'America/Sao_Paulo'
+      }).format(date);
+    } catch (error) {
+      return date.toLocaleString('pt-BR', { hour12: false });
+    }
+  };
+
+  const createBlobUrl = (content, type = 'text/plain') => {
+    try {
+      const blob = new Blob([content], { type });
+      return URL.createObjectURL(blob);
+    } catch (error) {
+      console.error('Nao foi possivel gerar o arquivo para download.', error);
+      return null;
+    }
+  };
+
+  const openHtmlDocument = (html) => {
+    if (!html) return false;
+    const url = createBlobUrl(html, 'text/html');
+    if (!url) return false;
+    const popup = window.open(url, '_blank', 'noopener');
+    if (!popup) {
+      URL.revokeObjectURL(url);
+      return false;
+    }
+
+    const cleanup = () => URL.revokeObjectURL(url);
+    const cleanupTimer = window.setTimeout(cleanup, 60000);
+    try {
+      popup.addEventListener('beforeunload', () => {
+        window.clearTimeout(cleanupTimer);
+        cleanup();
+      });
+    } catch (error) {
+      window.setTimeout(() => {
+        window.clearTimeout(cleanupTimer);
+        cleanup();
+      }, 60000);
+    }
+
+    return true;
+  };
+
+  const downloadHtmlDocument = (html, filename = 'contrato-hidrapink.html') => {
+    if (!html) return false;
+    const url = createBlobUrl(html, 'text/html');
+    if (!url) return false;
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename || 'contrato-hidrapink.html';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return true;
+  };
+
   const formatPercentage = (value) => {
     const number = Number(value);
     if (!Number.isFinite(number)) return '-';
@@ -800,6 +873,12 @@
     const credentialEmailField = document.getElementById('generatedLoginEmail');
     const credentialPasswordField = document.getElementById('generatedPassword');
 
+    const contractSection = document.getElementById('contractRecordSection');
+    const contractMessageEl = document.getElementById('contractRecordMessage');
+    const contractDetailsEl = document.getElementById('contractRecordDetails');
+    const viewContractRecordBtn = document.getElementById('viewContractRecordButton');
+    const downloadContractRecordBtn = document.getElementById('downloadContractRecordButton');
+
     addRealtimeValidation(form);
 
     const { applyMasks } = setupInfluencerFormHelpers(form, messageEl);
@@ -810,6 +889,8 @@
     const loginEmailInput = form?.elements?.loginEmail || null;
     const cpfInput = form?.elements?.cpf || null;
     const signatureCodeInput = form?.elements?.signatureCode || null;
+
+    let currentContractDocument = null;
 
     if (loginEmailInput) {
       loginEmailInput.setAttribute('readonly', '');
@@ -842,6 +923,113 @@
       credentialsBox.removeAttribute('hidden');
     };
 
+    const setMasterContractButtonsEnabled = (enabled) => {
+      if (viewContractRecordBtn) {
+        if (enabled) viewContractRecordBtn.removeAttribute('disabled');
+        else viewContractRecordBtn.setAttribute('disabled', '');
+      }
+      if (downloadContractRecordBtn) {
+        if (enabled) downloadContractRecordBtn.removeAttribute('disabled');
+        else downloadContractRecordBtn.setAttribute('disabled', '');
+      }
+    };
+
+    const resetContractRecord = ({ hide = false } = {}) => {
+      currentContractDocument = null;
+      if (contractDetailsEl) contractDetailsEl.innerHTML = '';
+      if (contractMessageEl) setMessage(contractMessageEl, '');
+      setMasterContractButtonsEnabled(false);
+      if (contractSection) {
+        if (hide) {
+          contractSection.setAttribute('hidden', 'hidden');
+        } else {
+          contractSection.removeAttribute('hidden');
+        }
+      }
+    };
+
+    const renderContractRecordDetails = (record) => {
+      if (!contractDetailsEl) return;
+      contractDetailsEl.innerHTML = '';
+      if (!record) return;
+
+      const influencerData = record.influencer || {};
+      const items = [
+        { label: 'Nome', value: influencerData.nome || '-' },
+        { label: 'CPF', value: maskCPF(influencerData.cpf || '') || '-' },
+        { label: 'E-mail de acesso', value: influencerData.loginEmail || '-' },
+        { label: 'E-mail de contato', value: influencerData.emailContato || '-' },
+        { label: 'Cupom', value: influencerData.cupom || '-' },
+        { label: 'Versão do termo', value: record.versao || '-' },
+        { label: 'Assinado em (Brasília)', value: record.datasAceite?.br || formatDateTimeDetailed(record.datasAceite) },
+        { label: 'Assinado em (UTC)', value: record.datasAceite?.utc || record.datasAceite?.iso || '-' },
+        { label: 'Hash SHA-256', value: record.hashTermo || '-', type: 'code' },
+        { label: 'Endereço IP', value: record.ipUsuario || '-' },
+        { label: 'Canal de autenticação', value: record.canalDescricao || record.canalAutenticacao || '-' },
+        { label: 'Status do aceite', value: record.status || '-' },
+        {
+          label: 'Código de assinatura gerado em',
+          value: record.datasCodigoAssinatura?.br || formatDateTimeDetailed(record.datasCodigoAssinatura)
+        },
+        { label: 'User agent registrado', value: record.userAgent || '-', type: 'pre' }
+      ];
+
+      const fragment = document.createDocumentFragment();
+      items.forEach((item) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'contract-summary__item';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'contract-summary__label';
+        labelEl.textContent = item.label;
+        wrapper.appendChild(labelEl);
+
+        const elementTag = item.type === 'pre' ? 'pre' : 'span';
+        const valueContainer = document.createElement(elementTag);
+        valueContainer.className = 'contract-summary__value';
+
+        if (item.type === 'code') {
+          const codeEl = document.createElement('code');
+          codeEl.textContent = item.value ?? '-';
+          valueContainer.appendChild(codeEl);
+        } else {
+          valueContainer.textContent = item.value ?? '-';
+        }
+
+        wrapper.appendChild(valueContainer);
+        fragment.appendChild(wrapper);
+      });
+
+      contractDetailsEl.appendChild(fragment);
+    };
+
+    const loadContractRecordForMaster = async (influencerId) => {
+      if (!contractSection) return;
+      contractSection.removeAttribute('hidden');
+      if (contractDetailsEl) contractDetailsEl.innerHTML = '';
+      setMasterContractButtonsEnabled(false);
+      if (contractMessageEl) setMessage(contractMessageEl, 'Verificando contrato assinado...', 'info');
+      currentContractDocument = null;
+      try {
+        const data = await apiFetch(`/api/contrato-assinado/influenciadora/${influencerId}`);
+        currentContractDocument = data;
+        renderContractRecordDetails(data);
+        setMessage(contractMessageEl, 'Contrato assinado disponível.', 'success');
+        setMasterContractButtonsEnabled(Boolean(data?.html));
+      } catch (error) {
+        currentContractDocument = null;
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 404) {
+          setMessage(contractMessageEl, 'A influenciadora ainda não concluiu o aceite eletrônico.', 'info');
+          return;
+        }
+        setMessage(contractMessageEl, error.message || 'Não foi possível carregar o contrato assinado.', 'error');
+      }
+    };
+
     const syncLoginEmail = () => {
       if (!loginEmailInput) return;
       const emailValue = (emailInput?.value || '').trim();
@@ -864,6 +1052,8 @@
     };
 
     syncCredentials();
+
+    resetContractRecord({ hide: true });
 
     emailInput?.addEventListener('input', syncLoginEmail);
     cpfInput?.addEventListener('input', syncLoginPassword);
@@ -904,6 +1094,7 @@
       if (clearMessage) setMessage(messageEl, '');
       clearQueryId();
       if (!preserveSummary) hideGeneratedCredentials();
+      resetContractRecord({ hide: true });
     };
 
     const loadInfluencerForEdit = async (id) => {
@@ -935,6 +1126,8 @@
         if (signatureCodeInput) {
           signatureCodeInput.value = '';
         }
+        resetContractRecord({ hide: false });
+        await loadContractRecordForMaster(numericId);
         setMessage(messageEl, 'Editando influenciadora selecionada.', 'info');
       } catch (error) {
         if (error.status === 401) {
@@ -944,6 +1137,33 @@
         setMessage(messageEl, error.message || 'Nao foi possivel carregar a influenciadora.', 'error');
       }
     };
+
+    viewContractRecordBtn?.addEventListener('click', () => {
+      if (!currentContractDocument?.html) {
+        setMessage(contractMessageEl, 'Contrato indisponível para visualização no momento.', 'error');
+        return;
+      }
+      const opened = openHtmlDocument(currentContractDocument.html);
+      if (!opened) {
+        setMessage(
+          contractMessageEl,
+          'Não foi possível abrir o contrato em uma nova aba. Verifique o bloqueio de pop-ups e tente novamente.',
+          'error'
+        );
+      }
+    });
+
+    downloadContractRecordBtn?.addEventListener('click', () => {
+      if (!currentContractDocument?.html) {
+        setMessage(contractMessageEl, 'Contrato indisponível para download no momento.', 'error');
+        return;
+      }
+      const filename = currentContractDocument.filename || 'contrato-hidrapink.html';
+      const success = downloadHtmlDocument(currentContractDocument.html, filename);
+      if (!success) {
+        setMessage(contractMessageEl, 'Não foi possível gerar o arquivo do contrato.', 'error');
+      }
+    });
 
     cancelBtn?.addEventListener('click', () => {
       resetForm({ clearMessage: true });
@@ -1884,6 +2104,119 @@
     const salesSummaryEl = document.getElementById('influencerSalesSummary');
     const salesTableBody = document.querySelector('#influencerSalesTable tbody');
 
+    const contractInfoEl = document.getElementById('influencerContractInfo');
+    const contractMessageEl = document.getElementById('influencerContractMessage');
+    const viewContractBtn = document.getElementById('viewSignedContractButton');
+    const downloadContractBtn = document.getElementById('downloadSignedContractButton');
+
+    let currentContractRecord = null;
+
+    const setContractButtonsEnabled = (enabled) => {
+      if (viewContractBtn) {
+        if (enabled) viewContractBtn.removeAttribute('disabled');
+        else viewContractBtn.setAttribute('disabled', '');
+      }
+      if (downloadContractBtn) {
+        if (enabled) downloadContractBtn.removeAttribute('disabled');
+        else downloadContractBtn.setAttribute('disabled', '');
+      }
+    };
+
+    const renderContractInfo = (record) => {
+      if (!contractInfoEl) return;
+      contractInfoEl.innerHTML = '';
+      if (!record) return;
+
+      const items = [
+        { label: 'Versão do termo', value: record.versao || '-' },
+        { label: 'Assinado em (Brasília)', value: formatDateTimeDetailed(record.datasAceite) },
+        { label: 'Assinado em (UTC)', value: record.datasAceite?.utc || record.datasAceite?.iso || '-' },
+        { label: 'Hash SHA-256', value: record.hashTermo || '-', type: 'code' },
+        { label: 'Endereço IP', value: record.ipUsuario || '-' },
+        { label: 'Canal de autenticação', value: record.canalDescricao || record.canalAutenticacao || '-' },
+        { label: 'Status do aceite', value: record.status || '-' },
+        { label: 'Código gerado em', value: formatDateTimeDetailed(record.datasCodigoAssinatura) }
+      ];
+
+      const fragment = document.createDocumentFragment();
+      items.forEach((item) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'info-item';
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'info-label';
+        labelEl.textContent = item.label;
+        wrapper.appendChild(labelEl);
+
+        const valueEl = document.createElement('span');
+        valueEl.className = 'info-value';
+        if (item.type === 'code') {
+          const codeEl = document.createElement('code');
+          codeEl.textContent = item.value ?? '-';
+          valueEl.appendChild(codeEl);
+        } else {
+          valueEl.textContent = item.value ?? '-';
+        }
+        wrapper.appendChild(valueEl);
+        fragment.appendChild(wrapper);
+      });
+
+      contractInfoEl.appendChild(fragment);
+    };
+
+    const loadContractRecord = async () => {
+      if (!contractMessageEl) return;
+      if (contractInfoEl) contractInfoEl.innerHTML = '';
+      setContractButtonsEnabled(false);
+      setMessage(contractMessageEl, 'Carregando contrato assinado...', 'info');
+      currentContractRecord = null;
+      try {
+        const data = await apiFetch('/api/contrato-assinado');
+        currentContractRecord = data;
+        renderContractInfo(data);
+        setMessage(contractMessageEl, 'Contrato assinado disponível para consulta.', 'success');
+        setContractButtonsEnabled(Boolean(data?.html));
+      } catch (error) {
+        currentContractRecord = null;
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 404) {
+          setMessage(contractMessageEl, 'Ainda não encontramos um contrato assinado para este acesso.', 'info');
+          return;
+        }
+        setMessage(contractMessageEl, error.message || 'Não foi possível carregar o contrato assinado.', 'error');
+      }
+    };
+
+    viewContractBtn?.addEventListener('click', () => {
+      if (!currentContractRecord?.html) {
+        setMessage(contractMessageEl, 'Contrato indisponível para visualização no momento.', 'error');
+        return;
+      }
+      const opened = openHtmlDocument(currentContractRecord.html);
+      if (!opened) {
+        setMessage(
+          contractMessageEl,
+          'Não foi possível abrir o contrato em uma nova aba. Verifique o bloqueio de pop-ups e tente novamente.',
+          'error'
+        );
+      }
+    });
+
+    downloadContractBtn?.addEventListener('click', () => {
+      if (!currentContractRecord?.html) {
+        setMessage(contractMessageEl, 'Contrato indisponível para download no momento.', 'error');
+        return;
+      }
+      const filename = currentContractRecord.filename || 'contrato-hidrapink.html';
+      const success = downloadHtmlDocument(currentContractRecord.html, filename);
+      if (!success) {
+        setMessage(contractMessageEl, 'Não foi possível iniciar o download do contrato.', 'error');
+      }
+    });
+
     const renderSalesSummary = (rows) => {
       if (!salesSummaryEl) return;
       salesSummaryEl.innerHTML = '';
@@ -2071,6 +2404,7 @@
     enforceTermAcceptance().then((allowed) => {
       if (!allowed) return;
       loadInfluencer();
+      loadContractRecord();
     });
   };
 
