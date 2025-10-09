@@ -26,6 +26,17 @@ const buildTransporter = async () => {
       secure
     };
 
+    const rejeitarNaoAutorizados = getBoolean(
+      process.env.SMTP_REJECT_UNAUTHORIZED,
+      true
+    );
+
+    if (!rejeitarNaoAutorizados) {
+      config.tls = {
+        rejectUnauthorized: false
+      };
+    }
+
     if (authUser) {
       config.auth = {
         user: authUser,

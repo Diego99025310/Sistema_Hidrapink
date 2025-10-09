@@ -9,11 +9,14 @@ Configure o servidor SMTP utilizado pela HidraPink definindo as variaveis abaixo
 - `SMTP_HOST`: endereco do servidor SMTP.
 - `SMTP_PORT`: porta (padrão 587).
 - `SMTP_SECURE`: `true` para conexao TLS implicita (porta 465), `false` caso contrario.
+- `SMTP_REJECT_UNAUTHORIZED`: defina como `false` para aceitar certificados autoassinados (padrao: `true`).
 - `SMTP_USER`: usuario para autenticacao (opcional caso o servidor permita envio sem autenticacao).
 - `SMTP_PASS`: senha do usuario SMTP.
 - `SMTP_FROM`: (opcional) remetente exibido no e-mail. Padrao: `HidraPink <no-reply@hidrapink.com.br>`.
 
 Com esses valores definidos o sistema enviara os codigos diretamente por meio do servidor informado.
+
+> ⚠️ **Atencao:** aceitar certificados autoassinados (`SMTP_REJECT_UNAUTHORIZED=false`) deve ser usado apenas quando o servidor SMTP utiliza certificados internos. Em ambientes de producao recomenda-se manter a validacao de certificados habilitada.
 
 ## Ambiente de desenvolvimento
 
