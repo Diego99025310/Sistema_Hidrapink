@@ -809,6 +809,7 @@
     const emailInput = form?.elements?.email || null;
     const loginEmailInput = form?.elements?.loginEmail || null;
     const cpfInput = form?.elements?.cpf || null;
+    const signatureCodeInput = form?.elements?.signatureCode || null;
 
     if (loginEmailInput) {
       loginEmailInput.setAttribute('readonly', '');
@@ -821,12 +822,16 @@
       if (credentialCodeField) credentialCodeField.value = '';
       if (credentialEmailField) credentialEmailField.value = '';
       if (credentialPasswordField) credentialPasswordField.value = '';
+      if (signatureCodeInput) signatureCodeInput.value = '';
     };
 
     const showGeneratedCredentials = (payload = {}) => {
       if (!credentialsBox) return;
       if (credentialCodeField) {
         credentialCodeField.value = payload.codigo_assinatura || payload.contractSignatureCode || '';
+      }
+      if (signatureCodeInput) {
+        signatureCodeInput.value = payload.codigo_assinatura || payload.contractSignatureCode || '';
       }
       if (credentialEmailField) {
         credentialEmailField.value = payload.login_email || payload.email_acesso || payload.loginEmail || '';
@@ -890,6 +895,10 @@
         const cpfDigits = digitOnly(cpfInput?.value || '');
         passwordInput.value = cpfDigits;
       }
+      if (signatureCodeInput) {
+        signatureCodeInput.placeholder = 'Gerado automaticamente após o cadastro';
+        signatureCodeInput.value = '';
+      }
       applyMasks();
       syncCredentials();
       if (clearMessage) setMessage(messageEl, '');
@@ -922,6 +931,9 @@
           passwordInput.removeAttribute('required');
           const cpfDigits = digitOnly(cpfInput?.value || '');
           passwordInput.value = cpfDigits;
+        }
+        if (signatureCodeInput) {
+          signatureCodeInput.value = '';
         }
         setMessage(messageEl, 'Editando influenciadora selecionada.', 'info');
       } catch (error) {
