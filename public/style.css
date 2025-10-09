@@ -541,9 +541,11 @@ body[data-page='influencer'] .influencer-details-card .info-status {
 
 body[data-page='influencer'] .influencer-details-card .card-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 12px; /* espaço fixo entre os botões */
   margin-top: 12px;
 }
+
 
 body[data-page='influencer'] .influencer-contract-card {
   display: grid;
