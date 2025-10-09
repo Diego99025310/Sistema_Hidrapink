@@ -305,6 +305,47 @@
     return data;
   };
 
+  const fetchAcceptanceStatus = async () => {
+    if (session.role !== 'influencer') {
+      return { aceito: true };
+    }
+
+    try {
+      return await apiFetch('/api/verificar-aceite');
+    } catch (error) {
+      if (error.status === 428) {
+        return { aceito: false, redirect: error.data?.redirect || '/aceite-termos' };
+      }
+      throw error;
+    }
+  };
+
+  const enforceTermAcceptance = async () => {
+    if (session.role !== 'influencer') {
+      return true;
+    }
+
+    try {
+      const status = await fetchAcceptanceStatus();
+      if (!status?.aceito) {
+        redirectTo(status?.redirect || '/aceite-termos');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (error.status === 428) {
+        redirectTo(error.data?.redirect || '/aceite-termos');
+        return false;
+      }
+      if (error.status === 401) {
+        logout();
+        return false;
+      }
+      console.error('Erro ao verificar aceite do termo de parceria:', error);
+      return true;
+    }
+  };
+
   const ensureAuth = (requiredRole) => {
     const token = session.token;
     const role = session.role;
@@ -1975,22 +2016,162 @@
       }
     };
 
-    loadInfluencer();
+    enforceTermAcceptance().then((allowed) => {
+      if (!allowed) return;
+      loadInfluencer();
+    });
   };
 
+
+  const initTermAcceptancePage = () => {
+    if (!ensureAuth()) return;
+    if (session.role !== 'influencer') {
+      redirectTo(session.role === 'master' ? 'master.html' : 'login.html');
+      return;
+    }
+    attachLogoutButtons();
+
+    const checkbox = document.getElementById('aceite');
+    const enviarBtn = document.getElementById('enviarCodigo');
+    const validarBtn = document.getElementById('validarCodigo');
+    const recusarBtn = document.getElementById('recusar');
+    const codigoInput = document.getElementById('codigo');
+    const verificacao = document.getElementById('verificacao');
+    const messageEl = document.getElementById('aceiteMessage');
+
+    const sanitizeCode = (value) => String(value || '').replace(/\D/g, '').slice(0, 6);
+
+    const toggleVerification = (visible) => {
+      if (!verificacao) return;
+      if (visible) {
+        verificacao.removeAttribute('hidden');
+      } else {
+        verificacao.setAttribute('hidden', 'hidden');
+      }
+    };
+
+    const setStatus = (message, type = 'info') => {
+      setMessage(messageEl, message, type);
+    };
+
+    codigoInput?.addEventListener('input', (event) => {
+      const target = event.target;
+      if (target) {
+        target.value = sanitizeCode(target.value);
+      }
+    });
+
+    const solicitarCodigo = async () => {
+      if (!checkbox?.checked) {
+        setStatus('Você precisa aceitar o termo para continuar.', 'error');
+        return;
+      }
+
+      setStatus('Validando sua elegibilidade...', 'info');
+      if (enviarBtn) enviarBtn.disabled = true;
+      try {
+        await apiFetch('/api/enviar-token', { method: 'POST', body: {} });
+        setStatus('Código liberado! Utilize o código de assinatura enviado pela equipe HidraPink.', 'success');
+        toggleVerification(true);
+        codigoInput?.focus();
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          redirectTo(error.data?.redirect || '/aceite-termos');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
+      } finally {
+        if (enviarBtn) enviarBtn.disabled = false;
+      }
+    };
+
+    enviarBtn?.addEventListener('click', solicitarCodigo);
+
+    validarBtn?.addEventListener('click', async () => {
+      const codigo = sanitizeCode(codigoInput?.value || '');
+      if (codigo.length !== 6) {
+        setStatus('Informe o código de assinatura com 6 dígitos.', 'error');
+        codigoInput?.focus();
+        return;
+      }
+
+      if (validarBtn) validarBtn.disabled = true;
+      setStatus('Validando código...', 'info');
+      try {
+        const response = await apiFetch('/api/validar-token', {
+          method: 'POST',
+          body: { codigo }
+        });
+        setStatus('Termo aceito com sucesso! Redirecionando...', 'success');
+        window.setTimeout(() => {
+          redirectTo(response?.redirect || 'influencer.html');
+        }, 800);
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          redirectTo(error.data?.redirect || '/aceite-termos');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
+      } finally {
+        if (validarBtn) validarBtn.disabled = false;
+      }
+    });
+
+    recusarBtn?.addEventListener('click', () => {
+      setStatus('Você optou por recusar o termo. Sessão encerrada.', 'info');
+      window.setTimeout(logout, 400);
+    });
+
+    const initialize = async () => {
+      try {
+        const status = await fetchAcceptanceStatus();
+        if (status?.aceito) {
+          redirectTo('influencer.html');
+          return;
+        }
+        toggleVerification(false);
+        setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          toggleVerification(false);
+          setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível verificar o status do termo.', 'error');
+      }
+    };
+
+    initialize();
+  };
 
   const initChangePasswordPage = () => {
     if (!ensureAuth()) return;
     attachLogoutButtons();
-    const form = document.getElementById('changePasswordForm');
-    const messageEl = document.getElementById('changePasswordMessage');
-    addRealtimeValidation(form);
 
-    form?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      setMessage(messageEl, 'Funcionalidade de alteracao de senha ainda nao esta disponivel.', 'info');
+    enforceTermAcceptance().then((allowed) => {
+      if (!allowed) return;
+
+      const form = document.getElementById('changePasswordForm');
+      const messageEl = document.getElementById('changePasswordMessage');
+      addRealtimeValidation(form);
+
+      form?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        setMessage(messageEl, 'Funcionalidade de alteracao de senha ainda nao esta disponivel.', 'info');
+      });
     });
-
   };
 
   const initResetPasswordPage = () => {
@@ -2025,6 +2206,7 @@
       'master-list': initMasterListPage,
       'master-sales': initMasterSalesPage,
       influencer: initInfluencerPage,
+      'aceite-termos': initTermAcceptancePage,
       'change-password': initChangePasswordPage,
       'reset-password': initResetPasswordPage
     };
