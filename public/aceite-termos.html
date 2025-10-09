@@ -32,17 +32,21 @@
           <button type="button" id="recusar" class="secondary">Recusar</button>
         </div>
 
-        <div id="verificacao" class="verificacao" hidden>
-          <p>Informe o código de assinatura de 6 dígitos enviado pela equipe HidraPink.</p>
-          <input
-            id="codigo"
-            type="text"
-            inputmode="numeric"
-            maxlength="6"
-            placeholder="Digite o código de assinatura"
-            autocomplete="one-time-code"
-          />
-          <button type="button" id="validarCodigo">Validar Código</button>
+        <div id="verificacao" class="verificacao" data-enabled="false">
+          <p class="verificacao__hint">Informe o código de assinatura de 6 dígitos enviado pela equipe HidraPink.</p>
+          <div class="verificacao__controls">
+            <input
+              id="codigo"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              placeholder="Digite o código de assinatura"
+              autocomplete="one-time-code"
+              disabled
+            />
+            <button type="button" id="validarCodigo" disabled>Validar Código</button>
+          </div>
+          <p class="verificacao__helper">O campo é liberado após aceitar os termos e clicar em “Continuar”.</p>
         </div>
 
         <p id="aceiteMessage" class="status-message"></p>
