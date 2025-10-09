@@ -2121,8 +2121,10 @@
       setVerificationEnabled(false);
       if (enviarBtn) enviarBtn.disabled = true;
       try {
-        await apiFetch('/api/enviar-token', { method: 'POST', body: {} });
-        setStatus('Código liberado! Utilize o código de assinatura enviado pela equipe HidraPink.', 'success');
+        const response = await apiFetch('/api/enviar-token', { method: 'POST', body: {} });
+        const successMessage = response?.message
+          || 'Código liberado! Utilize o código de assinatura enviado pela equipe HidraPink.';
+        setStatus(successMessage, 'success');
         setVerificationEnabled(true);
       } catch (error) {
         if (error.status === 401) {
@@ -2133,7 +2135,13 @@
           redirectTo(error.data?.redirect || '/aceite-termos');
           return;
         }
-        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
+        const message =
+          error.message
+          || 'Não foi possível validar o código de assinatura. Caso o problema persista, contate a equipe HidraPink.';
+        setStatus(message, 'error');
+        if (checkbox?.checked) {
+          setVerificationEnabled(true);
+        }
       } finally {
         if (enviarBtn) enviarBtn.disabled = false;
       }
