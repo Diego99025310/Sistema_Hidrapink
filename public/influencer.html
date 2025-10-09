@@ -18,22 +18,20 @@
           <h2 id="influencer-info-title" class="visually-hidden">Dados da influenciadora</h2>
           <div id="influencerDetails" class="info-grid" aria-live="polite"></div>
           <div class="card-actions">
-            <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
-            <button type="button" class="button-logout" data-action="logout">Sair</button>
+
           </div>
-      
+
+
+
+            <div class="card-actions influencer-contract-actions">
+              <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
+              <div id="influencerContractMessage" class="message" aria-live="polite" hidden></div>
+              <button type="button" class="button-logout" data-action="logout">Sair</button>
+            </div>
+
         </section>
 
-        <section class="card influencer-contract-card" aria-labelledby="influencer-contract-title">
-          <h2 id="influencer-contract-title">Contrato de Parceria</h2>
-          <p class="note">Acesse o contrato assinado e os dados de segurança registrados no aceite.</p>
-          <div id="influencerContractInfo" class="info-grid" aria-live="polite"></div>
-          <div class="card-actions influencer-contract-actions">
-            <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
-            <button type="button" id="downloadSignedContractButton" class="secondary-button" disabled>Baixar contrato</button>
-          </div>
-          <div id="influencerContractMessage" class="message" aria-live="polite"></div>
-        </section>
+
 
         <section class="card influencer-history-card" aria-labelledby="influencer-sales-title">
           <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
