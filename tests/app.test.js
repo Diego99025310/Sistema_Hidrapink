@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const request = require('supertest');
 
+const { gerarHashTermo } = require('../src/utils/hash');
+
 const tempDbPath = path.join(__dirname, '..', 'test.sqlite');
 
 if (fs.existsSync(tempDbPath)) {
@@ -22,8 +24,29 @@ const MASTER_PASSWORD = process.env.MASTER_PASSWORD || 'master123';
 
 const resetDb = () => {
   db.exec('DELETE FROM sales;');
+  db.exec('DELETE FROM aceite_termos;');
+  db.exec('DELETE FROM tokens_verificacao;');
   db.exec('DELETE FROM influenciadoras;');
   db.prepare('DELETE FROM users WHERE email != ?').run(MASTER_EMAIL);
+};
+
+const termoPath = path.join(__dirname, '..', 'public', 'termos', 'parceria-v1.html');
+
+const registrarAceiteTeste = (userId) => {
+  if (!userId) return;
+  const hash = gerarHashTermo(termoPath);
+  db.prepare(
+    `INSERT INTO aceite_termos (
+      user_id,
+      versao_termo,
+      hash_termo,
+      data_aceite,
+      ip_usuario,
+      user_agent,
+      canal_autenticacao,
+      status
+    ) VALUES (?, '1.0', ?, datetime('now'), '127.0.0.1', 'test-runner', 'token_email', 'aceito')`
+  ).run(userId, hash);
 };
 
 const login = (email, password) =>
@@ -257,6 +280,7 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   const influencerLogin = await login('vendas.influencer@example.com', 'SenhaInfluencer123');
   assert.strictEqual(influencerLogin.status, 200);
   const influencerToken = influencerLogin.body.token;
+  registrarAceiteTeste(influencerLogin.body.user?.id);
 
   const unauthorizedConsult = await request(app)
     .get('/influenciadoras/consulta')
