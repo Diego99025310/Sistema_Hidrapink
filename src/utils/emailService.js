@@ -11,7 +11,9 @@ const getBoolean = (value, defaultValue = false) => {
   return ['1', 'true', 'yes', 'sim'].includes(normalized);
 };
 
-const buildTransporter = () => {
+let transporterPromise;
+
+const buildTransporter = async () => {
   if (process.env.SMTP_HOST) {
     const port = Number.parseInt(process.env.SMTP_PORT || '', 10) || 587;
     const secure = getBoolean(process.env.SMTP_SECURE, port === 465);
@@ -31,13 +33,38 @@ const buildTransporter = () => {
       };
     }
 
-    return nodemailer.createTransport(config);
+    return {
+      transporter: nodemailer.createTransport(config),
+      tipo: 'smtp'
+    };
   }
 
-  return nodemailer.createTransport({ jsonTransport: true });
+  const contaTeste = await nodemailer.createTestAccount();
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: {
+      user: contaTeste.user,
+      pass: contaTeste.pass
+    }
+  });
+
+  console.info('[email] Modo de teste ativo. Nenhum email real sera enviado.');
+  console.info(`[email] Credenciais Ethereal: ${contaTeste.user} / ${contaTeste.pass}`);
+
+  return {
+    transporter,
+    tipo: 'ethereal'
+  };
 };
 
-const transporter = buildTransporter();
+const getTransporter = async () => {
+  if (!transporterPromise) {
+    transporterPromise = buildTransporter();
+  }
+  return transporterPromise;
+};
 
 const enviarCodigoVerificacao = async ({
   para,
@@ -51,6 +78,8 @@ const enviarCodigoVerificacao = async ({
     throw new Error('Codigo de verificacao nao informado.');
   }
 
+  const { transporter, tipo } = await getTransporter();
+
   const from = process.env.SMTP_FROM || 'HidraPink <no-reply@hidrapink.com.br>';
   const subject = 'Seu codigo de verificacao HidraPink';
   const texto = `Seu codigo de verificacao HidraPink: ${codigo}.\nEsse codigo expira em ${minutosExpiracao} minutos.`;
@@ -63,10 +92,19 @@ const enviarCodigoVerificacao = async ({
     html: `<p>Seu c&oacute;digo de verifica&ccedil;&atilde;o HidraPink: <strong>${codigo}</strong>.</p><p>Esse c&oacute;digo expira em ${minutosExpiracao} minutos.</p>`
   };
 
-  await transporter.sendMail(message);
+  const info = await transporter.sendMail(message);
+
+  if (tipo === 'ethereal') {
+    const urlPreview = nodemailer.getTestMessageUrl(info);
+    if (urlPreview) {
+      console.info(`[email] Visualize o email de teste em: ${urlPreview}`);
+    }
+  }
+
+  return info;
 };
 
 module.exports = {
-  transporter,
+  getTransporter,
   enviarCodigoVerificacao
 };
