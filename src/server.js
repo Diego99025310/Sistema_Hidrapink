@@ -1,4 +1,5 @@
-﻿const express = require('express');
+require('./config/env');
+const express = require('express');
 const path = require('path');
 const fs = require('node:fs');
 const bcrypt = require('bcryptjs');

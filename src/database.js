@@ -1,3 +1,4 @@
+require('./config/env');
 const path = require('path');
 
 const client = (process.env.DATABASE_CLIENT || process.env.DB_CLIENT || 'sqlite').toLowerCase();

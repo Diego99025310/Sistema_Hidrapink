@@ -4,7 +4,8 @@ O fluxo de aceite eletronico usa o Nodemailer para enviar o codigo de verificaca
 
 ## Ambiente de producao
 
-Configure o servidor SMTP utilizado pela HidraPink definindo as variaveis abaixo antes de iniciar o servidor:
+Configure o servidor SMTP utilizado pela HidraPink definindo as variaveis abaixo antes de iniciar o servidor.
+Em desenvolvimento local, basta ajustar o arquivo `.env` (copiado a partir de `.env.example`).
 
 - `SMTP_HOST`: endereco do servidor SMTP.
 - `SMTP_PORT`: porta (padrão 587).
@@ -35,7 +36,7 @@ O Zoho exige conexao segura na porta 465. Nao e necessario alterar `SMTP_REJECT_
 
 ## Ambiente de desenvolvimento
 
-Se nenhum `SMTP_HOST` for informado, o sistema cria automaticamente uma conta de teste no [Ethereal Email](https://ethereal.email/). Nao ha envio real de mensagens nesse modo. O console da aplicacao exibira:
+Se nenhum `SMTP_HOST` for informado (ou se voce remover as linhas correspondentes no `.env`), o sistema cria automaticamente uma conta de teste no [Ethereal Email](https://ethereal.email/). Nao ha envio real de mensagens nesse modo. O console da aplicacao exibira:
 
 - As credenciais geradas para a conta de teste.
 - A URL de visualizacao do e-mail com o codigo enviado.
