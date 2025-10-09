@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const createAceiteRouter = require('./routes/aceite');
+const verificarAceite = require('./middlewares/verificarAceite');
 
 const app = express();
 
@@ -24,6 +26,15 @@ const primaryStaticDir = staticDirs[0];
 
 app.use(express.json());
 staticDirs.forEach((dir) => app.use(express.static(dir)));
+
+app.get('/aceite-termos', (req, res) => {
+  const filePath = path.join(primaryStaticDir, 'aceite-termos.html');
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      res.status(err.status || 500).end();
+    }
+  });
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const TOKEN_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
@@ -289,6 +300,7 @@ const authenticate = (req, res, next) => {
       return res.status(401).json({ error: 'Usuario nao encontrado.' });
     }
     req.auth = { token, user };
+    req.user = user;
     return next();
   } catch (error) {
     return res.status(401).json({ error: 'Token invalido ou expirado.' });
@@ -301,6 +313,9 @@ const authorizeMaster = (req, res, next) => {
   }
   return next();
 };
+
+const aceiteRouter = createAceiteRouter({ authenticate });
+app.use('/api', aceiteRouter);
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : value);
 
@@ -917,7 +932,7 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a influenciadora.' });
   }
 });
-app.get('/influenciadora/:id', authenticate, (req, res) => {
+app.get('/influenciadora/:id', authenticate, verificarAceite, (req, res) => {
   const { influencer, status, message } = ensureInfluencerAccess(req, req.params.id);
   if (!influencer) {
     return res.status(status).json({ error: message });
@@ -927,7 +942,7 @@ app.get('/influenciadora/:id', authenticate, (req, res) => {
 
 
 
-app.put('/influenciadora/:id', authenticate, async (req, res) => {
+app.put('/influenciadora/:id', authenticate, verificarAceite, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: 'ID invalido.' });
@@ -1161,7 +1176,7 @@ app.delete('/sales/:id', authenticate, authorizeMaster, (req, res) => {
   }
 });
 
-app.get('/sales/summary/:influencerId', authenticate, (req, res) => {
+app.get('/sales/summary/:influencerId', authenticate, verificarAceite, (req, res) => {
   const { influencer, status, message } = ensureInfluencerAccess(req, req.params.influencerId);
   if (!influencer) {
     return res.status(status).json({ error: message });
@@ -1182,7 +1197,7 @@ app.get('/sales/summary/:influencerId', authenticate, (req, res) => {
   }
 });
 
-app.get('/sales/:influencerId', authenticate, (req, res) => {
+app.get('/sales/:influencerId', authenticate, verificarAceite, (req, res) => {
   const { influencer, status, message } = ensureInfluencerAccess(req, req.params.influencerId);
   if (!influencer) {
     return res.status(status).json({ error: message });
@@ -1216,7 +1231,7 @@ app.get('/influenciadoras/consulta', authenticate, authorizeMaster, (req, res) =
   }
 });
 
-app.get('/influenciadoras', authenticate, (req, res) => {
+app.get('/influenciadoras', authenticate, verificarAceite, (req, res) => {
   try {
     if (req.auth.user.role === 'master') {
       return res.status(200).json(listInfluencersStmt.all());
