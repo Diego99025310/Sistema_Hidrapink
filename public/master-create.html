@@ -47,9 +47,33 @@
 
           <div class="credentials-group">
             <span class="section-title">Credenciais de acesso</span>
-            <label>Email de acesso*<input name="loginEmail" type="email" placeholder="login@influencer.com" required /></label>
-            <label>Senha de acesso*<input name="loginPassword" type="password" placeholder="Senha temporaria (min. 6 caracteres)" required minlength="6" /></label>
+            <p class="credentials-hint">O e-mail e a senha provisória são preenchidos automaticamente a partir dos dados informados acima.</p>
+            <label>Email de acesso*<input name="loginEmail" type="email" placeholder="login@influencer.com" required readonly /></label>
+            <label>Senha de acesso*<input name="loginPassword" type="password" placeholder="Senha gerada automaticamente a partir do CPF" required minlength="6" readonly /></label>
+            <label>Código do contrato*<input name="signatureCode" type="text" placeholder="Gerado automaticamente após o cadastro" readonly /></label>
           </div>
+
+          <section id="generatedCredentials" class="credentials-summary" hidden>
+            <span class="section-title">Compartilhe com a influenciadora</span>
+            <p class="credentials-summary__description">
+              Entregue estes dados de acesso e o código de assinatura para que ela conclua o aceite do termo.
+            </p>
+            <div class="form-grid compact">
+              <label>Código de assinatura<input id="generatedSignatureCode" type="text" readonly /></label>
+              <label>Email de acesso<input id="generatedLoginEmail" type="text" readonly /></label>
+              <label>Senha provisória<input id="generatedPassword" type="text" readonly /></label>
+            </div>
+          </section>
+
+          <section id="contractRecordSection" class="contract-summary" hidden>
+            <span class="section-title">Contrato assinado</span>
+            <p id="contractRecordMessage" class="note"></p>
+            <div id="contractRecordDetails" class="contract-summary__details"></div>
+            <div class="contract-summary__actions">
+              <button type="button" id="viewContractRecordButton" disabled>Visualizar contrato assinado</button>
+              <button type="button" id="downloadContractRecordButton" class="secondary-button" disabled>Baixar contrato</button>
+            </div>
+          </section>
 
           <div class="button-row">
             <button type="submit">Cadastrar</button>
