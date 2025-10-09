@@ -2,6 +2,7 @@ require('./config/env');
 const express = require('express');
 const path = require('path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
@@ -108,6 +109,8 @@ const insertInfluencerStmt = db.prepare(`
     cidade,
     estado,
     commission_rate,
+    contract_signature_code_hash,
+    contract_signature_code_generated_at,
     user_id
   ) VALUES (
     @nome,
@@ -126,6 +129,8 @@ const insertInfluencerStmt = db.prepare(`
     @cidade,
     @estado,
     @commission_rate,
+    @contract_signature_code_hash,
+    @contract_signature_code_generated_at,
     @user_id
   )
 `);
@@ -155,6 +160,9 @@ const deleteInfluencerByIdStmt = db.prepare('DELETE FROM influenciadoras WHERE i
 const listInfluencersStmt = db.prepare(`${influencerBaseQuery} ORDER BY i.created_at DESC`);
 const findInfluencerByIdStmt = db.prepare(`${influencerBaseQuery} WHERE i.id = ?`);
 const findInfluencerByUserIdStmt = db.prepare(`${influencerBaseQuery} WHERE i.user_id = ?`);
+const findInfluencerSignatureStmt = db.prepare(
+  'SELECT contract_signature_code_hash, contract_signature_code_generated_at FROM influenciadoras WHERE user_id = ?'
+);
 const listInfluencerContactsStmt = db.prepare('SELECT user_id, contato FROM influenciadoras WHERE contato IS NOT NULL');
 const findInfluencerByCouponStmt = db.prepare(`${influencerBaseQuery} WHERE i.cupom IS NOT NULL AND LOWER(i.cupom) = LOWER(?) LIMIT 1`);
 
@@ -899,35 +907,54 @@ app.post('/login', async (req, res) => {
 });
 
 app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
-  const loginEmail = trimString(req.body?.loginEmail);
-  const loginPassword = req.body?.loginPassword;
   const { data, error } = normalizeInfluencerPayload(req.body || {});
 
   if (error) {
     return res.status(400).json(error);
   }
 
-  if (!loginEmail || !validators.email(loginEmail)) {
-    return res.status(400).json({ error: 'Informe um email de acesso valido.' });
+  const cpfDigits = normalizeDigits(req.body?.cpf || data?.cpf || '');
+  if (cpfDigits.length !== 11) {
+    return res.status(400).json({ error: 'Informe um CPF valido para gerar a senha provisoria.' });
   }
 
-  if (!validators.password(loginPassword)) {
-    return res.status(400).json({ error: 'Informe uma senha de acesso com no minimo 6 caracteres.' });
+  const loginEmail = trimString(req.body?.loginEmail) || data.email;
+  if (!loginEmail || !validators.email(loginEmail)) {
+    return res.status(400).json({ error: 'Informe um email valido para acesso.' });
   }
 
   if (findUserByEmailStmt.get(loginEmail)) {
     return res.status(409).json({ error: 'Email de login ja cadastrado.' });
   }
 
-  const passwordHash = await bcrypt.hash(loginPassword, 10);
+  const provisionalPassword = cpfDigits;
+  const passwordHash = await bcrypt.hash(provisionalPassword, 10);
+  const signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const signatureCodeHash = await bcrypt.hash(signatureCode, 10);
+  const generatedAt = new Date().toISOString();
 
   try {
-    const { influencerId } = createInfluencerTransaction(data, { email: loginEmail, passwordHash, mustChange: 0 });
+    const { influencerId } = createInfluencerTransaction(
+      {
+        ...data,
+        contract_signature_code_hash: signatureCodeHash,
+        contract_signature_code_generated_at: generatedAt
+      },
+      { email: loginEmail, passwordHash, mustChange: 0 }
+    );
     const influencer = findInfluencerByIdStmt.get(influencerId);
-    return res.status(201).json(influencer);
+    return res.status(201).json({
+      ...influencer,
+      login_email: loginEmail,
+      senha_provisoria: provisionalPassword,
+      codigo_assinatura: signatureCode
+    });
   } catch (err) {
     if (err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return res.status(409).json({ error: 'Instagram ou email ja cadastrado.' });
+    }
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Registro duplicado. Verifique os dados informados.' });
     }
     console.error('Erro ao cadastrar influenciadora:', err);
     return res.status(500).json({ error: 'Nao foi possivel cadastrar a influenciadora.' });

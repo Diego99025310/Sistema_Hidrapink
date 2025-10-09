@@ -249,6 +249,8 @@ if (client === 'mysql') {
         cidade VARCHAR(255),
         estado VARCHAR(20),
         commission_rate DECIMAL(5,2) DEFAULT 0,
+        contract_signature_code_hash VARCHAR(255),
+        contract_signature_code_generated_at DATETIME,
         user_id INT UNIQUE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_influenciadoras_user FOREIGN KEY (user_id)
@@ -318,6 +320,23 @@ if (client === 'mysql') {
         INDEX idx_tokens_user (user_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    const influencerColumns = await db.all(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+      [config.database, 'influenciadoras']
+    );
+
+    const influencerColumnNames = new Set(
+      Array.isArray(influencerColumns) ? influencerColumns.map((column) => column.COLUMN_NAME) : []
+    );
+
+    if (!influencerColumnNames.has('contract_signature_code_hash')) {
+      await db.exec('ALTER TABLE influenciadoras ADD COLUMN contract_signature_code_hash VARCHAR(255);');
+    }
+
+    if (!influencerColumnNames.has('contract_signature_code_generated_at')) {
+      await db.exec('ALTER TABLE influenciadoras ADD COLUMN contract_signature_code_generated_at DATETIME;');
+    }
 
     const salesColumns = await db.all(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
@@ -471,6 +490,8 @@ if (client === 'mysql') {
       cidade TEXT,
       estado TEXT,
       commission_rate REAL DEFAULT 0,
+      contract_signature_code_hash TEXT,
+      contract_signature_code_generated_at DATETIME,
       user_id INTEGER UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -486,80 +507,89 @@ if (client === 'mysql') {
       tableInfo = fetchInfo();
     }
 
-    const hasColumn = (name) => tableInfo.some((column) => column.name === name);
+    const hasColumn = (name, info = tableInfo) => info.some((column) => column.name === name);
     const emailColumn = tableInfo.find((column) => column.name === 'email');
     const hasLegacyColumns = ['conta', 'fone_ddd', 'fone_numero'].some((legacy) => hasColumn(legacy));
     const needsMigration = !hasColumn('contato') || !hasColumn('user_id') || !hasColumn('commission_rate') || hasLegacyColumns || (emailColumn && emailColumn.notnull === 1);
 
-    if (!needsMigration) {
-      return;
+    if (needsMigration) {
+      const stringExpression = (columnName) => (hasColumn(columnName) ? columnName : "''");
+      const contatoExpression = hasColumn('contato')
+        ? 'contato'
+        : "TRIM(COALESCE(fone_ddd, '') || CASE WHEN TRIM(COALESCE(fone_ddd, '')) <> '' AND TRIM(COALESCE(fone_numero, '')) <> '' THEN ' ' ELSE '' END || COALESCE(fone_numero, ''))";
+      const vendasQuantidadeExpression = hasColumn('vendas_quantidade') ? 'vendas_quantidade' : '0';
+      const vendasValorExpression = hasColumn('vendas_valor') ? 'vendas_valor' : '0';
+      const commissionExpression = hasColumn('commission_rate') ? 'commission_rate' : '0';
+
+      db.exec('BEGIN');
+      try {
+        db.exec('DROP TABLE IF EXISTS influenciadoras_new;');
+        db.exec(createInfluenciadorasTable('influenciadoras_new'));
+
+        db.exec(`
+          INSERT INTO influenciadoras_new (
+            id,
+            nome,
+            instagram,
+            cpf,
+            email,
+            contato,
+            cupom,
+            vendas_quantidade,
+            vendas_valor,
+            cep,
+            numero,
+            complemento,
+            logradouro,
+            bairro,
+            cidade,
+            estado,
+            commission_rate,
+            user_id,
+            created_at
+          )
+          SELECT
+            id,
+            nome,
+            instagram,
+            NULLIF(${stringExpression('cpf')}, '') AS cpf,
+            NULLIF(${stringExpression('email')}, '') AS email,
+            NULLIF(${contatoExpression}, '') AS contato,
+            NULLIF(${stringExpression('cupom')}, '') AS cupom,
+            ${vendasQuantidadeExpression} AS vendas_quantidade,
+            ${vendasValorExpression} AS vendas_valor,
+            NULLIF(${stringExpression('cep')}, '') AS cep,
+            NULLIF(${stringExpression('numero')}, '') AS numero,
+            NULLIF(${stringExpression('complemento')}, '') AS complemento,
+            NULLIF(${stringExpression('logradouro')}, '') AS logradouro,
+            NULLIF(${stringExpression('bairro')}, '') AS bairro,
+            NULLIF(${stringExpression('cidade')}, '') AS cidade,
+            NULLIF(${stringExpression('estado')}, '') AS estado,
+            ${commissionExpression} AS commission_rate,
+            CASE WHEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} IS NOT NULL THEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} ELSE NULL END AS user_id,
+            created_at
+          FROM influenciadoras;
+        `);
+
+        db.exec('DROP TABLE influenciadoras;');
+        db.exec('ALTER TABLE influenciadoras_new RENAME TO influenciadoras;');
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+      tableInfo = fetchInfo();
     }
 
-    const stringExpression = (columnName) => (hasColumn(columnName) ? columnName : "''");
-    const contatoExpression = hasColumn('contato')
-      ? 'contato'
-      : "TRIM(COALESCE(fone_ddd, '') || CASE WHEN TRIM(COALESCE(fone_ddd, '')) <> '' AND TRIM(COALESCE(fone_numero, '')) <> '' THEN ' ' ELSE '' END || COALESCE(fone_numero, ''))";
-    const vendasQuantidadeExpression = hasColumn('vendas_quantidade') ? 'vendas_quantidade' : '0';
-    const vendasValorExpression = hasColumn('vendas_valor') ? 'vendas_valor' : '0';
-    const commissionExpression = hasColumn('commission_rate') ? 'commission_rate' : '0';
+    const ensureColumn = (name, definition) => {
+      if (!hasColumn(name)) {
+        db.exec(`ALTER TABLE influenciadoras ADD COLUMN ${definition};`);
+        tableInfo = fetchInfo();
+      }
+    };
 
-    db.exec('BEGIN');
-    try {
-      db.exec('DROP TABLE IF EXISTS influenciadoras_new;');
-      db.exec(createInfluenciadorasTable('influenciadoras_new'));
-
-      db.exec(`
-        INSERT INTO influenciadoras_new (
-          id,
-          nome,
-          instagram,
-          cpf,
-          email,
-          contato,
-          cupom,
-          vendas_quantidade,
-          vendas_valor,
-          cep,
-          numero,
-          complemento,
-          logradouro,
-          bairro,
-          cidade,
-          estado,
-          commission_rate,
-          user_id,
-          created_at
-        )
-        SELECT
-          id,
-          nome,
-          instagram,
-          NULLIF(${stringExpression('cpf')}, '') AS cpf,
-          NULLIF(${stringExpression('email')}, '') AS email,
-          NULLIF(${contatoExpression}, '') AS contato,
-          NULLIF(${stringExpression('cupom')}, '') AS cupom,
-          ${vendasQuantidadeExpression} AS vendas_quantidade,
-          ${vendasValorExpression} AS vendas_valor,
-          NULLIF(${stringExpression('cep')}, '') AS cep,
-          NULLIF(${stringExpression('numero')}, '') AS numero,
-          NULLIF(${stringExpression('complemento')}, '') AS complemento,
-          NULLIF(${stringExpression('logradouro')}, '') AS logradouro,
-          NULLIF(${stringExpression('bairro')}, '') AS bairro,
-          NULLIF(${stringExpression('cidade')}, '') AS cidade,
-          NULLIF(${stringExpression('estado')}, '') AS estado,
-          ${commissionExpression} AS commission_rate,
-          CASE WHEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} IS NOT NULL THEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} ELSE NULL END AS user_id,
-          created_at
-        FROM influenciadoras;
-      `);
-
-      db.exec('DROP TABLE influenciadoras;');
-      db.exec('ALTER TABLE influenciadoras_new RENAME TO influenciadoras;');
-      db.exec('COMMIT');
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
-    }
+    ensureColumn('contract_signature_code_hash', 'contract_signature_code_hash TEXT');
+    ensureColumn('contract_signature_code_generated_at', 'contract_signature_code_generated_at DATETIME');
   };
 
   const createSalesTable = (tableName = 'sales') => `

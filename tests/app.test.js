@@ -107,18 +107,18 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
   const createResponse = await request(app)
     .post('/influenciadora')
     .set('Authorization', `Bearer ${masterToken}`)
-    .send({
-      ...influencerPayload,
-      loginEmail: 'influencer.login@example.com',
-      loginPassword: 'SenhaSegura123'
-    });
+    .send(influencerPayload);
 
   assert.strictEqual(createResponse.status, 201);
   const influencerId = createResponse.body.id;
   assert.ok(influencerId);
   assert.strictEqual(Number(createResponse.body.commission_rate), influencerPayload.commissionPercent);
+  assert.strictEqual(createResponse.body.login_email, influencerPayload.email);
+  assert.strictEqual(createResponse.body.senha_provisoria, influencerPayload.cpf);
+  assert.ok(createResponse.body.codigo_assinatura);
+  assert.strictEqual(createResponse.body.codigo_assinatura.length, 6);
 
-  const influencerLogin = await login('influencer.login@example.com', 'SenhaSegura123');
+  const influencerLogin = await login(influencerPayload.email, influencerPayload.cpf);
   assert.strictEqual(influencerLogin.status, 200);
   assert.strictEqual(influencerLogin.body.user.role, 'influencer');
   assert.ok(influencerLogin.body.token);
@@ -137,7 +137,7 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
   assert.strictEqual(updateResponse.body.contato, '(21) 99123-4567');
   assert.strictEqual(Number(updateResponse.body.commission_rate), 15);
 
-  const newLogin = await login('influencer.login@example.com', 'NovaSenha456');
+  const newLogin = await login(influencerPayload.email, 'NovaSenha456');
   assert.strictEqual(newLogin.status, 200);
   assert.ok(newLogin.body.token);
 
@@ -155,11 +155,7 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   const createInfluencer = await request(app)
     .post('/influenciadora')
     .set('Authorization', `Bearer ${masterToken}`)
-    .send({
-      ...influencerPayload,
-      loginEmail: 'vendas.influencer@example.com',
-      loginPassword: 'SenhaInfluencer123'
-    });
+    .send(influencerPayload);
 
   assert.strictEqual(createInfluencer.status, 201);
   const influencerId = createInfluencer.body.id;
@@ -277,7 +273,10 @@ test('gestao de vendas vinculada a influenciadora', async () => {
   assert.strictEqual(Number(consultRowUpdated.vendas_count), 2);
   assert.strictEqual(Number(consultRowUpdated.vendas_total), 1450);
 
-  const influencerLogin = await login('vendas.influencer@example.com', 'SenhaInfluencer123');
+  const influencerLogin = await login(
+    createInfluencer.body.login_email,
+    createInfluencer.body.senha_provisoria
+  );
   assert.strictEqual(influencerLogin.status, 200);
   const influencerToken = influencerLogin.body.token;
   registrarAceiteTeste(influencerLogin.body.user?.id);

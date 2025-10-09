@@ -1,22 +1,11 @@
 const express = require('express');
-const crypto = require('crypto');
 const path = require('path');
 const db = require('../database');
 const { gerarHashTermo } = require('../utils/hash');
-const { enviarCodigoVerificacao } = require('../utils/emailService');
 const { VERSAO_TERMO_ATUAL } = require('../middlewares/verificarAceite');
+const bcrypt = require('bcryptjs');
 
 const TERMO_PATH = path.resolve(__dirname, '..', '..', 'public', 'termos', 'parceria-v1.html');
-const TOKEN_EXPIRACAO_MINUTOS = 5;
-
-const invalidateTokensStmt = db.prepare('UPDATE tokens_verificacao SET usado = 1 WHERE user_id = ?');
-const insertTokenStmt = db.prepare(
-  'INSERT INTO tokens_verificacao (user_id, token, expira_em, usado) VALUES (?, ?, ?, 0)'
-);
-const findTokenStmt = db.prepare(
-  'SELECT id, token, expira_em, usado FROM tokens_verificacao WHERE user_id = ? AND token = ? ORDER BY expira_em DESC LIMIT 1'
-);
-const markTokenUsedStmt = db.prepare('UPDATE tokens_verificacao SET usado = 1 WHERE id = ?');
 const insertAceiteStmt = db.prepare(
   `INSERT INTO aceite_termos (
       user_id,
@@ -32,7 +21,9 @@ const insertAceiteStmt = db.prepare(
 const selectAceiteStmt = db.prepare(
   'SELECT versao_termo, data_aceite, hash_termo FROM aceite_termos WHERE user_id = ? ORDER BY data_aceite DESC LIMIT 1'
 );
-const findUserByIdStmt = db.prepare('SELECT id, email, role FROM users WHERE id = ?');
+const findSignatureStmt = db.prepare(
+  'SELECT contract_signature_code_hash, contract_signature_code_generated_at FROM influenciadoras WHERE user_id = ?'
+);
 
 const resolveMaybePromise = async (value) => {
   if (value && typeof value.then === 'function') {
@@ -44,8 +35,6 @@ const resolveMaybePromise = async (value) => {
 const obterUsuarioAutenticado = (req) => req.auth?.user || req.user || null;
 
 const limparCodigo = (codigo) => String(codigo || '').replace(/\D/g, '').slice(0, 6);
-
-const gerarCodigo = () => String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 
 const obterIp = (req) => {
   const header = req.headers['x-forwarded-for'];
@@ -93,25 +82,16 @@ const buildRouter = ({ authenticate }) => {
         return res.status(200).json({ message: 'Termo de parceria ja foi aceito.' });
       }
 
-      const dadosUsuario = await resolveMaybePromise(findUserByIdStmt.get(user.id));
-      if (!dadosUsuario?.email) {
-        return res.status(400).json({ error: 'Nao foi possivel localizar o email cadastrado.' });
+      const assinatura = await resolveMaybePromise(findSignatureStmt.get(user.id));
+      if (!assinatura?.contract_signature_code_hash) {
+        return res.status(409).json({
+          error: 'Codigo de assinatura nao encontrado. Entre em contato com a equipe HidraPink.'
+        });
       }
 
-      await callStmt(invalidateTokensStmt, 'run', user.id);
-
-      const codigo = gerarCodigo();
-      const expiraEm = Date.now() + TOKEN_EXPIRACAO_MINUTOS * 60 * 1000;
-
-      await callStmt(insertTokenStmt, 'run', user.id, codigo, expiraEm);
-
-      await enviarCodigoVerificacao({
-        para: dadosUsuario.email,
-        codigo,
-        minutosExpiracao: TOKEN_EXPIRACAO_MINUTOS
+      return res.json({
+        message: 'Digite o código de assinatura informado pela equipe HidraPink para finalizar o aceite.'
       });
-
-      return res.json({ message: 'Codigo de verificacao enviado para o seu email cadastrado.' });
     } catch (error) {
       return next(error);
     }
@@ -134,7 +114,7 @@ const buildRouter = ({ authenticate }) => {
 
       const codigo = limparCodigo(req.body?.codigo || req.body?.token);
       if (!codigo || codigo.length !== 6) {
-        return res.status(400).json({ error: 'Informe o codigo de 6 digitos enviado ao email.' });
+        return res.status(400).json({ error: 'Informe o codigo de assinatura com 6 digitos.' });
       }
 
       const aceiteAtual = await resolveMaybePromise(selectAceiteStmt.get(user.id));
@@ -142,16 +122,17 @@ const buildRouter = ({ authenticate }) => {
         return res.status(200).json({ message: 'Termo de parceria ja foi aceito.' });
       }
 
-      const registroToken = await resolveMaybePromise(findTokenStmt.get(user.id, codigo));
-      if (!registroToken || registroToken.usado) {
-        return res.status(400).json({ error: 'Codigo invalido ou ja utilizado.' });
+      const assinatura = await resolveMaybePromise(findSignatureStmt.get(user.id));
+      if (!assinatura?.contract_signature_code_hash) {
+        return res.status(409).json({
+          error: 'Codigo de assinatura nao encontrado. Entre em contato com a equipe HidraPink.'
+        });
       }
 
-      if (Number(registroToken.expira_em) < Date.now()) {
-        return res.status(400).json({ error: 'Codigo expirado. Solicite um novo envio.' });
+      const codigoValido = await bcrypt.compare(codigo, assinatura.contract_signature_code_hash);
+      if (!codigoValido) {
+        return res.status(400).json({ error: 'Codigo de assinatura invalido.' });
       }
-
-      await callStmt(markTokenUsedStmt, 'run', registroToken.id);
 
       const hashTermo = gerarHashTermo(TERMO_PATH);
       const dataAceite = new Date().toISOString();
@@ -167,7 +148,7 @@ const buildRouter = ({ authenticate }) => {
         dataAceite,
         ipUsuario || null,
         userAgent,
-        'token_email',
+        'codigo_assinatura',
         'aceito'
       );
 

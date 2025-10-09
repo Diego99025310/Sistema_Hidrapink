@@ -2034,7 +2034,6 @@
     const checkbox = document.getElementById('aceite');
     const enviarBtn = document.getElementById('enviarCodigo');
     const validarBtn = document.getElementById('validarCodigo');
-    const reenviarBtn = document.getElementById('reenviarCodigo');
     const recusarBtn = document.getElementById('recusar');
     const codigoInput = document.getElementById('codigo');
     const verificacao = document.getElementById('verificacao');
@@ -2068,11 +2067,11 @@
         return;
       }
 
-      setStatus('Enviando código de verificação...', 'info');
-      [enviarBtn, reenviarBtn].forEach((btn) => btn && (btn.disabled = true));
+      setStatus('Validando sua elegibilidade...', 'info');
+      if (enviarBtn) enviarBtn.disabled = true;
       try {
         await apiFetch('/api/enviar-token', { method: 'POST', body: {} });
-        setStatus('Código enviado! Verifique o seu e-mail cadastrado.', 'success');
+        setStatus('Código liberado! Utilize o código de assinatura enviado pela equipe HidraPink.', 'success');
         toggleVerification(true);
         codigoInput?.focus();
       } catch (error) {
@@ -2084,19 +2083,18 @@
           redirectTo(error.data?.redirect || '/aceite-termos');
           return;
         }
-        setStatus(error.message || 'Não foi possível enviar o código.', 'error');
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
       } finally {
-        [enviarBtn, reenviarBtn].forEach((btn) => btn && (btn.disabled = false));
+        if (enviarBtn) enviarBtn.disabled = false;
       }
     };
 
     enviarBtn?.addEventListener('click', solicitarCodigo);
-    reenviarBtn?.addEventListener('click', solicitarCodigo);
 
     validarBtn?.addEventListener('click', async () => {
       const codigo = sanitizeCode(codigoInput?.value || '');
       if (codigo.length !== 6) {
-        setStatus('Informe o código de 6 dígitos recebido por e-mail.', 'error');
+        setStatus('Informe o código de assinatura com 6 dígitos.', 'error');
         codigoInput?.focus();
         return;
       }
@@ -2121,7 +2119,7 @@
           redirectTo(error.data?.redirect || '/aceite-termos');
           return;
         }
-        setStatus(error.message || 'Não foi possível validar o código.', 'error');
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
       } finally {
         if (validarBtn) validarBtn.disabled = false;
       }
@@ -2140,7 +2138,7 @@
           return;
         }
         toggleVerification(false);
-        setStatus('Leia o termo, aceite e confirme com o código enviado ao seu e-mail.', 'info');
+        setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
       } catch (error) {
         if (error.status === 401) {
           logout();
@@ -2148,7 +2146,7 @@
         }
         if (error.status === 428) {
           toggleVerification(false);
-          setStatus('Leia o termo, aceite e confirme com o código enviado ao seu e-mail.', 'info');
+          setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
           return;
         }
         setStatus(error.message || 'Não foi possível verificar o status do termo.', 'error');
