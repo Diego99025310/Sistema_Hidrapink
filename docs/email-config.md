@@ -18,6 +18,21 @@ Com esses valores definidos o sistema enviara os codigos diretamente por meio do
 
 > ⚠️ **Atencao:** aceitar certificados autoassinados (`SMTP_REJECT_UNAUTHORIZED=false`) deve ser usado apenas quando o servidor SMTP utiliza certificados internos. Em ambientes de producao recomenda-se manter a validacao de certificados habilitada.
 
+### Exemplo com Zoho Mail
+
+Para contas hospedadas no Zoho Mail utilize a configuracao abaixo (substitua a senha por um [app password do Zoho](https://www.zoho.com/mail/help/adminconsole/mail-password-policy.html#alink3) ou pela senha autorizada para SMTP):
+
+```env
+SMTP_HOST=smtp.zoho.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=diego@hidrapink.com.br
+SMTP_PASS="<senha ou app password>"
+SMTP_FROM="HidraPink <diego@hidrapink.com.br>"
+```
+
+O Zoho exige conexao segura na porta 465. Nao e necessario alterar `SMTP_REJECT_UNAUTHORIZED`, pois os certificados do Zoho sao reconhecidos publicamente. Caso utilize autenticao em duas etapas, crie uma senha especifica de aplicativo para o envio.
+
 ## Ambiente de desenvolvimento
 
 Se nenhum `SMTP_HOST` for informado, o sistema cria automaticamente uma conta de teste no [Ethereal Email](https://ethereal.email/). Nao ha envio real de mensagens nesse modo. O console da aplicacao exibira:
