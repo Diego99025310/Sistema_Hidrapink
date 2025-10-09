@@ -305,6 +305,47 @@
     return data;
   };
 
+  const fetchAcceptanceStatus = async () => {
+    if (session.role !== 'influencer') {
+      return { aceito: true };
+    }
+
+    try {
+      return await apiFetch('/api/verificar-aceite');
+    } catch (error) {
+      if (error.status === 428) {
+        return { aceito: false, redirect: error.data?.redirect || '/aceite-termos' };
+      }
+      throw error;
+    }
+  };
+
+  const enforceTermAcceptance = async () => {
+    if (session.role !== 'influencer') {
+      return true;
+    }
+
+    try {
+      const status = await fetchAcceptanceStatus();
+      if (!status?.aceito) {
+        redirectTo(status?.redirect || '/aceite-termos');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      if (error.status === 428) {
+        redirectTo(error.data?.redirect || '/aceite-termos');
+        return false;
+      }
+      if (error.status === 401) {
+        logout();
+        return false;
+      }
+      console.error('Erro ao verificar aceite do termo de parceria:', error);
+      return true;
+    }
+  };
+
   const ensureAuth = (requiredRole) => {
     const token = session.token;
     const role = session.role;
@@ -754,6 +795,11 @@
     const messageEl = document.getElementById('masterMessage');
     const cancelBtn = document.getElementById('cancelEditButton');
 
+    const credentialsBox = document.getElementById('generatedCredentials');
+    const credentialCodeField = document.getElementById('generatedSignatureCode');
+    const credentialEmailField = document.getElementById('generatedLoginEmail');
+    const credentialPasswordField = document.getElementById('generatedPassword');
+
     addRealtimeValidation(form);
 
     const { applyMasks } = setupInfluencerFormHelpers(form, messageEl);
@@ -767,6 +813,29 @@
     if (loginEmailInput) {
       loginEmailInput.setAttribute('readonly', '');
     }
+
+    const hideGeneratedCredentials = () => {
+      if (credentialsBox) {
+        credentialsBox.setAttribute('hidden', 'hidden');
+      }
+      if (credentialCodeField) credentialCodeField.value = '';
+      if (credentialEmailField) credentialEmailField.value = '';
+      if (credentialPasswordField) credentialPasswordField.value = '';
+    };
+
+    const showGeneratedCredentials = (payload = {}) => {
+      if (!credentialsBox) return;
+      if (credentialCodeField) {
+        credentialCodeField.value = payload.codigo_assinatura || payload.contractSignatureCode || '';
+      }
+      if (credentialEmailField) {
+        credentialEmailField.value = payload.login_email || payload.email_acesso || payload.loginEmail || '';
+      }
+      if (credentialPasswordField) {
+        credentialPasswordField.value = payload.senha_provisoria || payload.provisionalPassword || '';
+      }
+      credentialsBox.removeAttribute('hidden');
+    };
 
     const syncLoginEmail = () => {
       if (!loginEmailInput) return;
@@ -805,7 +874,7 @@
       }
     };
 
-    const resetForm = ({ clearMessage = false } = {}) => {
+    const resetForm = ({ clearMessage = false, preserveSummary = false } = {}) => {
       editingId = null;
       if (form) {
         form.reset();
@@ -825,6 +894,7 @@
       syncCredentials();
       if (clearMessage) setMessage(messageEl, '');
       clearQueryId();
+      if (!preserveSummary) hideGeneratedCredentials();
     };
 
     const loadInfluencerForEdit = async (id) => {
@@ -839,6 +909,7 @@
         fillInfluencerFormFields(form, target);
         applyMasks();
         syncCredentials();
+        hideGeneratedCredentials();
         editingId = numericId;
         if (form) {
           form.dataset.mode = 'edit';
@@ -895,9 +966,19 @@
       const method = currentEditId ? 'PUT' : 'POST';
 
       try {
-        await apiFetch(endpoint, { method, body });
-        setMessage(messageEl, currentEditId ? 'Influenciadora atualizada com sucesso.' : 'Influenciadora cadastrada com sucesso.', 'success');
-        resetForm({ clearMessage: false });
+        const response = await apiFetch(endpoint, { method, body });
+        if (currentEditId) {
+          setMessage(messageEl, 'Influenciadora atualizada com sucesso.', 'success');
+          resetForm({ clearMessage: false });
+        } else {
+          setMessage(
+            messageEl,
+            'Influenciadora cadastrada com sucesso. Compartilhe as credenciais geradas abaixo.',
+            'success'
+          );
+          resetForm({ clearMessage: false, preserveSummary: true });
+          showGeneratedCredentials(response || {});
+        }
       } catch (error) {
         if (error.status === 401) {
           logout();
@@ -1975,22 +2056,172 @@
       }
     };
 
-    loadInfluencer();
+    enforceTermAcceptance().then((allowed) => {
+      if (!allowed) return;
+      loadInfluencer();
+    });
   };
 
+
+  const initTermAcceptancePage = () => {
+    if (!ensureAuth()) return;
+    if (session.role !== 'influencer') {
+      redirectTo(session.role === 'master' ? 'master.html' : 'login.html');
+      return;
+    }
+    attachLogoutButtons();
+
+    const checkbox = document.getElementById('aceite');
+    const enviarBtn = document.getElementById('enviarCodigo');
+    const validarBtn = document.getElementById('validarCodigo');
+    const recusarBtn = document.getElementById('recusar');
+    const codigoInput = document.getElementById('codigo');
+    const verificacao = document.getElementById('verificacao');
+    const messageEl = document.getElementById('aceiteMessage');
+
+    const sanitizeCode = (value) => String(value || '').replace(/\D/g, '').slice(0, 6);
+
+    const setVerificationEnabled = (enabled) => {
+      if (!verificacao) return;
+      if (enabled) {
+        verificacao.dataset.enabled = 'true';
+        codigoInput?.removeAttribute('disabled');
+        validarBtn?.removeAttribute('disabled');
+        codigoInput?.focus();
+      } else {
+        verificacao.dataset.enabled = 'false';
+        if (codigoInput) {
+          codigoInput.value = '';
+          codigoInput.setAttribute('disabled', '');
+        }
+        validarBtn?.setAttribute('disabled', '');
+      }
+    };
+
+    const setStatus = (message, type = 'info') => {
+      setMessage(messageEl, message, type);
+    };
+
+    setVerificationEnabled(false);
+
+    codigoInput?.addEventListener('input', (event) => {
+      const target = event.target;
+      if (target) {
+        target.value = sanitizeCode(target.value);
+      }
+    });
+
+    const solicitarCodigo = async () => {
+      if (!checkbox?.checked) {
+        setStatus('Você precisa aceitar o termo para continuar.', 'error');
+        return;
+      }
+
+      setStatus('Validando sua elegibilidade...', 'info');
+      setVerificationEnabled(false);
+      if (enviarBtn) enviarBtn.disabled = true;
+      try {
+        await apiFetch('/api/enviar-token', { method: 'POST', body: {} });
+        setStatus('Código liberado! Utilize o código de assinatura enviado pela equipe HidraPink.', 'success');
+        setVerificationEnabled(true);
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          redirectTo(error.data?.redirect || '/aceite-termos');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
+      } finally {
+        if (enviarBtn) enviarBtn.disabled = false;
+      }
+    };
+
+    enviarBtn?.addEventListener('click', solicitarCodigo);
+
+    validarBtn?.addEventListener('click', async () => {
+      const codigo = sanitizeCode(codigoInput?.value || '');
+      if (codigo.length !== 6) {
+        setStatus('Informe o código de assinatura com 6 dígitos.', 'error');
+        codigoInput?.focus();
+        return;
+      }
+
+      if (validarBtn) validarBtn.disabled = true;
+      setStatus('Validando código...', 'info');
+      try {
+        const response = await apiFetch('/api/validar-token', {
+          method: 'POST',
+          body: { codigo }
+        });
+        setStatus('Termo aceito com sucesso! Redirecionando...', 'success');
+        window.setTimeout(() => {
+          redirectTo(response?.redirect || 'influencer.html');
+        }, 800);
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          redirectTo(error.data?.redirect || '/aceite-termos');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível validar o código de assinatura.', 'error');
+      } finally {
+        if (validarBtn) validarBtn.disabled = false;
+      }
+    });
+
+    recusarBtn?.addEventListener('click', () => {
+      setStatus('Você optou por recusar o termo. Sessão encerrada.', 'info');
+      window.setTimeout(logout, 400);
+    });
+
+    const initialize = async () => {
+      try {
+        const status = await fetchAcceptanceStatus();
+        if (status?.aceito) {
+          redirectTo('influencer.html');
+          return;
+        }
+        setVerificationEnabled(false);
+        setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
+      } catch (error) {
+        if (error.status === 401) {
+          logout();
+          return;
+        }
+        if (error.status === 428) {
+          setVerificationEnabled(false);
+          setStatus('Leia o termo, aceite e confirme com o código de assinatura fornecido pela HidraPink.', 'info');
+          return;
+        }
+        setStatus(error.message || 'Não foi possível verificar o status do termo.', 'error');
+      }
+    };
+
+    initialize();
+  };
 
   const initChangePasswordPage = () => {
     if (!ensureAuth()) return;
     attachLogoutButtons();
-    const form = document.getElementById('changePasswordForm');
-    const messageEl = document.getElementById('changePasswordMessage');
-    addRealtimeValidation(form);
 
-    form?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      setMessage(messageEl, 'Funcionalidade de alteracao de senha ainda nao esta disponivel.', 'info');
+    enforceTermAcceptance().then((allowed) => {
+      if (!allowed) return;
+
+      const form = document.getElementById('changePasswordForm');
+      const messageEl = document.getElementById('changePasswordMessage');
+      addRealtimeValidation(form);
+
+      form?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        setMessage(messageEl, 'Funcionalidade de alteracao de senha ainda nao esta disponivel.', 'info');
+      });
     });
-
   };
 
   const initResetPasswordPage = () => {
@@ -2025,6 +2256,7 @@
       'master-list': initMasterListPage,
       'master-sales': initMasterSalesPage,
       influencer: initInfluencerPage,
+      'aceite-termos': initTermAcceptancePage,
       'change-password': initChangePasswordPage,
       'reset-password': initResetPasswordPage
     };
