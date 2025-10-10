@@ -5,36 +5,335 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Painel Influenciadora | HidraPink</title>
     <link rel="stylesheet" href="style.css" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body[data-page='influencer'] {
+        display: flex;
+        justify-content: center;
+        padding: clamp(1.5rem, 4vw, 4rem) clamp(1rem, 6vw, 5rem);
+        background-size: cover;
+      }
+
+      body[data-page='influencer'] .container {
+        width: min(100%, 72rem);
+        display: grid;
+        gap: clamp(1.5rem, 4vw, 2.5rem);
+      }
+
+      .influencer-hero {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        gap: 1rem;
+        padding: clamp(2rem, 6vw, 3.5rem);
+        text-align: left;
+      }
+
+      .hero-content {
+        display: grid;
+        gap: clamp(0.5rem, 2vw, 0.85rem);
+        max-width: 32rem;
+      }
+
+      .hero-eyebrow {
+        margin: 0;
+        font-size: clamp(0.85rem, 2.4vw, 1rem);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .influencer-hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.25), transparent 60%),
+          radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.2), transparent 55%);
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .influencer-hero > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .influencer-hero h1 {
+        font-size: clamp(2rem, 6vw, 3rem);
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+      }
+
+      .influencer-hero p {
+        margin: 0;
+        font-size: clamp(1rem, 3.2vw, 1.35rem);
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .dashboard-grid.influencer-layout {
+        display: grid;
+        gap: clamp(1.5rem, 4vw, 2.5rem);
+      }
+
+      .card {
+        border-radius: clamp(1rem, 3vw, 1.75rem);
+        padding: clamp(1.5rem, 4vw, 2.25rem);
+        backdrop-filter: saturate(110%) blur(16px);
+      }
+
+      .card h2 {
+        font-size: clamp(1.35rem, 4vw, 1.75rem);
+      }
+
+      .card-headline {
+        display: grid;
+        gap: 0.5rem;
+        text-align: center;
+      }
+
+      .card-headline p {
+        margin: 0;
+        font-size: clamp(0.95rem, 2.6vw, 1.1rem);
+        color: var(--text-secondary);
+      }
+
+      .info-grid {
+        display: grid;
+        gap: clamp(1rem, 3vw, 1.5rem);
+      }
+
+      .info-grid dl {
+        display: grid;
+        gap: 0.35rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.68);
+        border: 1px solid rgba(228, 68, 122, 0.18);
+        box-shadow: 0 1.5rem 3rem rgba(228, 68, 122, 0.08);
+      }
+
+      .info-grid dt {
+        font-size: clamp(0.85rem, 2.4vw, 0.95rem);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+      }
+
+      .info-grid dd {
+        margin: 0;
+        font-size: clamp(1rem, 2.8vw, 1.25rem);
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .card-actions {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .card-actions button,
+      .card-actions .button-logout {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 2.75rem;
+        min-width: 10rem;
+        padding: 0.85rem 1.5rem;
+        border-radius: 999px;
+        border: none;
+        font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+      }
+
+      #viewSignedContractButton {
+        background: #fff;
+        color: var(--pink-strong);
+        box-shadow: 0 1.2rem 2.6rem rgba(228, 68, 122, 0.18);
+      }
+
+      #viewSignedContractButton:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .button-logout {
+        background: var(--pink-strong);
+        color: #fff;
+        box-shadow: 0 1.2rem 2.6rem rgba(228, 68, 122, 0.28);
+      }
+
+      .button-logout:hover,
+      .button-logout:focus-visible,
+      #viewSignedContractButton:hover:enabled,
+      #viewSignedContractButton:focus-visible:enabled {
+        transform: translateY(-2px);
+      }
+
+      .message {
+        font-size: clamp(0.9rem, 2.4vw, 1rem);
+        padding: 0.75rem 1rem;
+        border-radius: 0.85rem;
+        background: rgba(255, 230, 239, 0.65);
+        border: 1px solid rgba(228, 68, 122, 0.22);
+      }
+
+      .sales-summary-inline {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      }
+
+      .sales-summary-inline .metric {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(228, 68, 122, 0.18);
+        border-radius: 1rem;
+        padding: 1rem;
+        display: grid;
+        gap: 0.25rem;
+        text-align: center;
+      }
+
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(228, 68, 122, 0.18);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .table-wrapper::-webkit-scrollbar {
+        height: 0.6rem;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb {
+        background: rgba(228, 68, 122, 0.35);
+        border-radius: 999px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 32rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: clamp(0.75rem, 2.5vw, 1rem);
+        font-size: clamp(0.9rem, 2.6vw, 1rem);
+      }
+
+      thead {
+        background: rgba(228, 68, 122, 0.1);
+      }
+
+      tbody tr:nth-child(odd) {
+        background: rgba(255, 230, 239, 0.4);
+      }
+
+      tbody tr:hover {
+        background: rgba(228, 68, 122, 0.12);
+      }
+
+      @media (min-width: 480px) {
+        .info-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .card-actions {
+          grid-auto-flow: column;
+          justify-content: start;
+          align-items: center;
+        }
+      }
+
+      @media (min-width: 768px) {
+        .influencer-hero {
+          grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+          align-items: center;
+        }
+
+        .influencer-hero::after {
+          background: radial-gradient(circle at 25% 40%, rgba(255, 255, 255, 0.25), transparent 62%),
+            radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.28), transparent 55%);
+        }
+
+        .influencer-hero p {
+          max-width: 28rem;
+        }
+
+        .info-grid {
+          grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .dashboard-grid.influencer-layout {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+        }
+
+        .card-headline {
+          text-align: left;
+        }
+
+        .card-actions {
+          justify-content: space-between;
+        }
+      }
+
+      @media (min-width: 1440px) {
+        body[data-page='influencer'] {
+          padding: clamp(3rem, 6vw, 6rem) clamp(4rem, 8vw, 7rem);
+        }
+
+        .dashboard-grid.influencer-layout {
+          gap: clamp(2rem, 3vw, 3rem);
+        }
+      }
+    </style>
     <script defer src="main.js"></script>
   </head>
   <body data-page="influencer">
     <div class="container" id="influencerPage">
       <header class="page-hero influencer-hero">
-        <h1>Bem vinda, Pinklover.</h1>
+        <div class="hero-content">
+          <p class="hero-eyebrow">Painel da Influenciadora</p>
+          <h1>Bem vinda, Pinklover.</h1>
+          <p>
+            Acompanhe seu contrato, suas métricas de vendas e todo o histórico atualizado em
+            tempo real.
+          </p>
+        </div>
       </header>
 
       <main class="dashboard-grid influencer-layout">
         <section class="card influencer-details-card" aria-labelledby="influencer-info-title">
-          <h2 id="influencer-info-title" class="visually-hidden">Dados da influenciadora</h2>
-          <div id="influencerDetails" class="info-grid" aria-live="polite"></div>
-          <div class="card-actions">
-
+          <div class="card-headline">
+            <h2 id="influencer-info-title">Seus dados</h2>
+            <p>Revise suas informações pessoais, atualizadas automaticamente pelo time HidraPink.</p>
           </div>
-
-
-
-            <div class="card-actions influencer-contract-actions">
-              <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
-              <div id="influencerContractMessage" class="message" aria-live="polite" hidden></div>
-              <button type="button" class="button-logout" data-action="logout">Sair</button>
-            </div>
-
+          <div id="influencerDetails" class="info-grid" aria-live="polite"></div>
+          <div class="card-actions influencer-contract-actions">
+            <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
+            <div id="influencerContractMessage" class="message" aria-live="polite" hidden></div>
+            <button type="button" class="button-logout" data-action="logout">Sair</button>
+          </div>
         </section>
 
 
 
         <section class="card influencer-history-card" aria-labelledby="influencer-sales-title">
-          <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
+          <div class="card-headline">
+            <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
+            <p>Visualize os resultados das suas campanhas, pedidos e comissões em cada ciclo.</p>
+          </div>
           <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
           <div id="influencerSalesSummary" class="sales-summary-inline" aria-live="polite"></div>
           <div class="table-wrapper">
