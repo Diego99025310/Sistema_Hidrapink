@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Influenciadoras Cadastradas | Sistema Influenciadoras</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="master-list">
+    <div class="container">
+      <header>
+        <h1>Influenciadoras cadastradas</h1>
+        <p>Gerencie os registros já cadastrados.</p>
+        <button type="button" data-action="logout">Sair</button>
+      </header>
+
+      <section class="card">
+        <div class="link-grid" style="margin-bottom:16px;">
+          <a class="link-card" href="master-create.html">Cadastrar</a>
+          <a class="link-card" href="master-consult.html">Consulta</a>
+          <a class="link-card" href="master-sales.html">Registrar venda</a>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div>
+            <h2>Lista atual</h2>
+            <p class="note">Edite ou exclua usando os botoes de acao.</p>
+          </div>
+          <button type="button" id="reloadInfluencers">Recarregar lista</button>
+        </div>
+        <div id="influencersList" class="influencers-list"></div>
+        <div id="listMessage" class="message" aria-live="polite"></div>
+      </section>
+    </div>
+  </body>
+</html>

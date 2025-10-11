@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+
+# Arquivos de ambiente
+.env
+
+# Logs
+logs/
+*.log
+
+# Temporários / cache
+tmp/
+.cache/
+dist/
