@@ -1220,7 +1220,8 @@
         ...normalized,
         commissionPercent: normalized.commissionPercent !== '' ? Number(normalized.commissionPercent) : undefined,
         loginEmail: normalized.loginEmail || undefined,
-        loginPassword: normalized.loginPassword || undefined
+        loginPassword: normalized.loginPassword || undefined,
+        optionalImport: allowOptionalFields && !currentEditId ? true : undefined
       };
 
       const endpoint = currentEditId ? `/influenciadora/${currentEditId}` : '/influenciadora';
