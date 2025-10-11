@@ -509,6 +509,7 @@
 
   const validateInfluencerPayload = (form, payload, options = {}) => {
     const requireCredentials = options.requireCredentials ?? true;
+    const requirePrimaryFields = options.requirePrimaryFields ?? true;
     const errors = [];
     const mark = (name, condition, message) => {
       const field = form?.elements?.[name];
@@ -524,8 +525,13 @@
     const estado = (payload.estado || '').trim();
     const commissionPercent = payload.commissionPercent;
 
-    mark('nome', Boolean(nome), 'Informe o nome.');
-    mark('instagram', Boolean(instagram), 'Informe o Instagram.');
+    if (requirePrimaryFields) {
+      mark('nome', Boolean(nome), 'Informe o nome.');
+      mark('instagram', Boolean(instagram), 'Informe o Instagram.');
+    } else {
+      mark('nome', true);
+      mark('instagram', true);
+    }
 
     mark('cpf', isValidCPF(payload.cpf), 'CPF invalido.');
     mark('email', !email || validators.email(email), 'Email invalido.');
@@ -868,6 +874,8 @@
     const messageEl = document.getElementById('masterMessage');
     const cancelBtn = document.getElementById('cancelEditButton');
 
+    const allowOptionalFields = (document.body?.dataset?.allowOptionalFields || '').toLowerCase() === 'true';
+
     const credentialsBox = document.getElementById('generatedCredentials');
     const credentialCodeField = document.getElementById('generatedSignatureCode');
     const credentialEmailField = document.getElementById('generatedLoginEmail');
@@ -893,7 +901,11 @@
     let currentContractDocument = null;
 
     if (loginEmailInput) {
-      loginEmailInput.setAttribute('readonly', '');
+      if (allowOptionalFields) {
+        loginEmailInput.removeAttribute('readonly');
+      } else {
+        loginEmailInput.setAttribute('readonly', '');
+      }
     }
 
     const hideGeneratedCredentials = () => {
@@ -1051,12 +1063,20 @@
       syncLoginPassword();
     };
 
-    syncCredentials();
+    if (!allowOptionalFields) {
+      syncCredentials();
+    } else {
+      if (passwordInput) {
+        passwordInput.removeAttribute('readonly');
+      }
+    }
 
     resetContractRecord({ hide: true });
 
-    emailInput?.addEventListener('input', syncLoginEmail);
-    cpfInput?.addEventListener('input', syncLoginPassword);
+    if (!allowOptionalFields) {
+      emailInput?.addEventListener('input', syncLoginEmail);
+      cpfInput?.addEventListener('input', syncLoginPassword);
+    }
 
     let editingId = null;
 
@@ -1080,10 +1100,16 @@
         form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
       }
       if (passwordInput) {
-        passwordInput.placeholder = 'Senha gerada automaticamente a partir do CPF';
-        passwordInput.setAttribute('required', '');
-        const cpfDigits = digitOnly(cpfInput?.value || '');
-        passwordInput.value = cpfDigits;
+        if (allowOptionalFields) {
+          passwordInput.placeholder = 'Defina uma senha provisória';
+          passwordInput.removeAttribute('required');
+          passwordInput.value = '';
+        } else {
+          passwordInput.placeholder = 'Senha gerada automaticamente a partir do CPF';
+          passwordInput.setAttribute('required', '');
+          const cpfDigits = digitOnly(cpfInput?.value || '');
+          passwordInput.value = cpfDigits;
+        }
       }
       if (signatureCodeInput) {
         signatureCodeInput.placeholder = 'Gerado automaticamente após o cadastro';
@@ -1178,9 +1204,12 @@
       const normalized = normalizeInfluencerForSubmit(payload);
       const currentEditId = editingId ?? Number(form?.dataset?.editId || 0);
       editingId = currentEditId || null;
-      const requireCredentials = !currentEditId;
+      const requireCredentials = !currentEditId && !allowOptionalFields;
 
-      const validation = validateInfluencerPayload(form, normalized, { requireCredentials });
+      const validation = validateInfluencerPayload(form, normalized, {
+        requireCredentials,
+        requirePrimaryFields: !allowOptionalFields
+      });
       if (!validation.isValid) {
         setMessage(messageEl, validation.errors.join(' '), 'error');
         focusFirstInvalidField(form);
@@ -1191,7 +1220,8 @@
         ...normalized,
         commissionPercent: normalized.commissionPercent !== '' ? Number(normalized.commissionPercent) : undefined,
         loginEmail: normalized.loginEmail || undefined,
-        loginPassword: normalized.loginPassword || undefined
+        loginPassword: normalized.loginPassword || undefined,
+        optionalImport: allowOptionalFields && !currentEditId ? true : undefined
       };
 
       const endpoint = currentEditId ? `/influenciadora/${currentEditId}` : '/influenciadora';
@@ -1203,13 +1233,18 @@
           setMessage(messageEl, 'Influenciadora atualizada com sucesso.', 'success');
           resetForm({ clearMessage: false });
         } else {
-          setMessage(
-            messageEl,
-            'Influenciadora cadastrada com sucesso. Compartilhe as credenciais geradas abaixo.',
-            'success'
-          );
+          const successMessage = allowOptionalFields
+            ? 'Influenciadora importada com sucesso. Ajuste os dados quando necessário.'
+            : 'Influenciadora cadastrada com sucesso. Compartilhe as credenciais geradas abaixo.';
+          setMessage(messageEl, successMessage, 'success');
           resetForm({ clearMessage: false, preserveSummary: true });
-          showGeneratedCredentials(response || {});
+          if (!allowOptionalFields) {
+            showGeneratedCredentials(response || {});
+          } else if (response && (response.codigo_assinatura || response.login_email || response.senha_provisoria)) {
+            showGeneratedCredentials(response);
+          } else {
+            hideGeneratedCredentials();
+          }
         }
       } catch (error) {
         if (error.status === 401) {
