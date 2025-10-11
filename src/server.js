@@ -328,8 +328,7 @@ app.use('/api', aceiteRouter);
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : value);
 
-const normalizeInfluencerPayload = (body, options = {}) => {
-  const allowMissingPrimary = Boolean(options.allowMissingPrimary);
+const normalizeInfluencerPayload = (body) => {
   const normalized = {
     nome: trimString(body.nome),
     instagram: trimString(body.instagram),
@@ -350,8 +349,8 @@ const normalizeInfluencerPayload = (body, options = {}) => {
   };
 
   const missing = [];
-  if (!normalized.nome && !allowMissingPrimary) missing.push('nome');
-  if (!normalized.instagram && !allowMissingPrimary) missing.push('instagram');
+  if (!normalized.nome) missing.push('nome');
+  if (!normalized.instagram) missing.push('instagram');
   if (missing.length) {
     return { error: { error: 'Campos obrigatorios faltando.', campos: missing } };
   }
@@ -425,16 +424,10 @@ const normalizeInfluencerPayload = (body, options = {}) => {
 
   const estadoValue = normalized.estado ? normalized.estado.toUpperCase() : null;
 
-  const instagramValue = normalized.instagram
-    ? normalized.instagram.startsWith('@')
-      ? normalized.instagram
-      : `@${normalized.instagram}`
-    : null;
-
   return {
     data: {
-      nome: normalized.nome || null,
-      instagram: instagramValue,
+      nome: normalized.nome,
+      instagram: normalized.instagram.startsWith('@') ? normalized.instagram : `@${normalized.instagram}`,
       cpf: formattedCpf,
       email: normalized.email || null,
       contato: formattedContato,
@@ -789,16 +782,11 @@ const formatSaleRow = (row) => {
 };
 
 const createInfluencerTransaction = db.transaction((influencerPayload, userPayload) => {
-  if (userPayload) {
-    const mustChange = userPayload.mustChange ?? 0;
-    const userResult = insertUserStmt.run(userPayload.email, userPayload.passwordHash, 'influencer', mustChange);
-    const userId = userResult.lastInsertRowid;
-    const influencerResult = insertInfluencerStmt.run({ ...influencerPayload, user_id: userId });
-    return { influencerId: influencerResult.lastInsertRowid, userId };
-  }
-
-  const influencerResult = insertInfluencerStmt.run({ ...influencerPayload, user_id: null });
-  return { influencerId: influencerResult.lastInsertRowid, userId: null };
+  const mustChange = userPayload.mustChange ?? 0;
+  const userResult = insertUserStmt.run(userPayload.email, userPayload.passwordHash, 'influencer', mustChange);
+  const userId = userResult.lastInsertRowid;
+  const influencerResult = insertInfluencerStmt.run({ ...influencerPayload, user_id: userId });
+  return { influencerId: influencerResult.lastInsertRowid, userId };
 });
 
 const formatUserResponse = (user) => ({ id: user.id, email: user.email, role: user.role });
@@ -919,69 +907,31 @@ app.post('/login', async (req, res) => {
 });
 
 app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
-  const allowPartialImport = String(req.body?.optionalImport ?? '').toLowerCase() === 'true';
-
-  const { data, error } = normalizeInfluencerPayload(req.body || {}, {
-    allowMissingPrimary: allowPartialImport
-  });
+  const { data, error } = normalizeInfluencerPayload(req.body || {});
 
   if (error) {
     return res.status(400).json(error);
   }
 
-  if (allowPartialImport) {
-    const randomSuffix = crypto.randomBytes(4).toString('hex');
-    if (!data.nome) {
-      data.nome = `Importado ${randomSuffix}`;
-    }
-    if (!data.instagram) {
-      data.instagram = `@importado_${randomSuffix}`;
-    }
-  }
-
   const cpfDigits = normalizeDigits(req.body?.cpf || data?.cpf || '');
-  const loginEmailInput = trimString(req.body?.loginEmail);
-  const contactEmail = data.email;
-  const loginEmail = allowPartialImport ? loginEmailInput : loginEmailInput || contactEmail;
-
-  if (!allowPartialImport) {
-    if (cpfDigits.length !== 11) {
-      return res.status(400).json({ error: 'Informe um CPF valido para gerar a senha provisoria.' });
-    }
-    if (!loginEmail || !validators.email(loginEmail)) {
-      return res.status(400).json({ error: 'Informe um email valido para acesso.' });
-    }
-  } else {
-    if (loginEmail && !validators.email(loginEmail)) {
-      return res.status(400).json({ error: 'Informe um email valido para acesso.' });
-    }
-    const hasCpf = cpfDigits.length === 11;
-    if ((loginEmail && !hasCpf) || (hasCpf && !loginEmail)) {
-      return res
-        .status(400)
-        .json({ error: 'Informe CPF e email de acesso para gerar credenciais, ou deixe ambos em branco.' });
-    }
+  if (cpfDigits.length !== 11) {
+    return res.status(400).json({ error: 'Informe um CPF valido para gerar a senha provisoria.' });
   }
 
-  if (loginEmail && findUserByEmailStmt.get(loginEmail)) {
+  const loginEmail = trimString(req.body?.loginEmail) || data.email;
+  if (!loginEmail || !validators.email(loginEmail)) {
+    return res.status(400).json({ error: 'Informe um email valido para acesso.' });
+  }
+
+  if (findUserByEmailStmt.get(loginEmail)) {
     return res.status(409).json({ error: 'Email de login ja cadastrado.' });
   }
 
-  const shouldCreateCredentials = Boolean(loginEmail);
-
-  let provisionalPassword = null;
-  let signatureCode = null;
-  let signatureCodeHash = null;
-  let generatedAt = null;
-  let passwordHash = null;
-
-  if (shouldCreateCredentials) {
-    provisionalPassword = cpfDigits;
-    passwordHash = await bcrypt.hash(provisionalPassword, 10);
-    signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-    signatureCodeHash = await bcrypt.hash(signatureCode, 10);
-    generatedAt = new Date().toISOString();
-  }
+  const provisionalPassword = cpfDigits;
+  const passwordHash = await bcrypt.hash(provisionalPassword, 10);
+  const signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const signatureCodeHash = await bcrypt.hash(signatureCode, 10);
+  const generatedAt = new Date().toISOString();
 
   try {
     const { influencerId } = createInfluencerTransaction(
@@ -990,18 +940,15 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
         contract_signature_code_hash: signatureCodeHash,
         contract_signature_code_generated_at: generatedAt
       },
-      shouldCreateCredentials ? { email: loginEmail, passwordHash, mustChange: 0 } : null
+      { email: loginEmail, passwordHash, mustChange: 0 }
     );
     const influencer = findInfluencerByIdStmt.get(influencerId);
-    const responsePayload = {
-      ...influencer
-    };
-    if (shouldCreateCredentials) {
-      responsePayload.login_email = loginEmail;
-      responsePayload.senha_provisoria = provisionalPassword;
-      responsePayload.codigo_assinatura = signatureCode;
-    }
-    return res.status(201).json(responsePayload);
+    return res.status(201).json({
+      ...influencer,
+      login_email: loginEmail,
+      senha_provisoria: provisionalPassword,
+      codigo_assinatura: signatureCode
+    });
   } catch (err) {
     if (err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return res.status(409).json({ error: 'Instagram ou email ja cadastrado.' });
