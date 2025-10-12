@@ -25,6 +25,12 @@ const selectAceiteStmt = db.prepare(
 const findSignatureStmt = db.prepare(
   'SELECT contract_signature_code_hash, contract_signature_code_generated_at FROM influenciadoras WHERE user_id = ?'
 );
+const selectContractWaiverByUserStmt = db.prepare(
+  'SELECT contract_signature_waived FROM influenciadoras WHERE user_id = ? LIMIT 1'
+);
+const selectContractWaiverByInfluencerStmt = db.prepare(
+  'SELECT contract_signature_waived FROM influenciadoras WHERE id = ? LIMIT 1'
+);
 const contratoAssinadoSelectBase = `
   SELECT
     a.id AS aceite_id,
@@ -86,6 +92,47 @@ const callStmt = async (stmt, method, ...args) => {
     return result;
   }
   return result;
+};
+
+const isContractWaivedValue = (value) => {
+  if (value == null) {
+    return false;
+  }
+  if (typeof value === 'object' && value.contract_signature_waived != null) {
+    return isContractWaivedValue(value.contract_signature_waived);
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  const numeric = Number(value);
+  if (!Number.isNaN(numeric)) {
+    return numeric === 1;
+  }
+  return false;
+};
+
+const isContractWaivedForUser = async (userId) => {
+  if (!userId) {
+    return false;
+  }
+  const waiver = await callStmt(selectContractWaiverByUserStmt, 'get', userId);
+  return isContractWaivedValue(waiver);
+};
+
+const isContractWaivedForInfluencer = async (influencerId) => {
+  if (!influencerId) {
+    return false;
+  }
+  const waiver = await callStmt(selectContractWaiverByInfluencerStmt, 'get', influencerId);
+  return isContractWaivedValue(waiver);
+};
+
+const respondContractWaived = (res, scope = 'master') => {
+  const message =
+    scope === 'own'
+      ? 'A assinatura do contrato foi dispensada para sua conta.'
+      : 'A assinatura do contrato foi dispensada para esta influenciadora.';
+  return res.status(404).json({ error: message });
 };
 
 const MAX_USER_AGENT_LENGTH = 512;
@@ -599,6 +646,10 @@ const buildRouter = ({ authenticate }) => {
         return res.json({ aceito: true, versaoAtual: VERSAO_TERMO_ATUAL, role: user.role });
       }
 
+      if (await isContractWaivedForUser(user.id)) {
+        return res.json({ aceito: true, versaoAtual: VERSAO_TERMO_ATUAL, dispensado: true });
+      }
+
       const aceite = await resolveMaybePromise(selectAceiteStmt.get(user.id));
       const aceito = Boolean(aceite && aceite.versao_termo === VERSAO_TERMO_ATUAL);
 
@@ -632,6 +683,10 @@ const buildRouter = ({ authenticate }) => {
         return res.status(403).json({ error: 'Recurso disponivel apenas para influenciadoras.' });
       }
 
+      if (await isContractWaivedForUser(user.id)) {
+        return respondContractWaived(res, 'own');
+      }
+
       const contract = await getSignedContractForUser({ userId: user.id });
       if (!contract) {
         return res.status(404).json({ error: 'Nenhum contrato assinado foi localizado.' });
@@ -656,6 +711,10 @@ const buildRouter = ({ authenticate }) => {
 
       if (user.role !== 'influencer') {
         return res.status(403).json({ error: 'Recurso disponivel apenas para influenciadoras.' });
+      }
+
+      if (await isContractWaivedForUser(user.id)) {
+        return respondContractWaived(res, 'own');
       }
 
       const contract = await getSignedContractForUser({ userId: user.id });
@@ -689,6 +748,10 @@ const buildRouter = ({ authenticate }) => {
         return res.status(400).json({ error: 'Identificador de influenciadora invalido.' });
       }
 
+      if (await isContractWaivedForInfluencer(influencerId)) {
+        return respondContractWaived(res);
+      }
+
       const contract = await getSignedContractForUser({ influencerId });
       if (!contract) {
         return res.status(404).json({ error: 'Nenhum contrato assinado foi localizado para esta influenciadora.' });
@@ -718,6 +781,10 @@ const buildRouter = ({ authenticate }) => {
       const influencerId = Number(req.params.id);
       if (!Number.isInteger(influencerId) || influencerId <= 0) {
         return res.status(400).json({ error: 'Identificador de influenciadora invalido.' });
+      }
+
+      if (await isContractWaivedForInfluencer(influencerId)) {
+        return respondContractWaived(res);
       }
 
       const contract = await getSignedContractForUser({ influencerId });

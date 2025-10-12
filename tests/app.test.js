@@ -117,6 +117,7 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
   assert.strictEqual(createResponse.body.senha_provisoria, influencerPayload.cpf);
   assert.ok(createResponse.body.codigo_assinatura);
   assert.strictEqual(createResponse.body.codigo_assinatura.length, 6);
+  assert.strictEqual(Number(createResponse.body.contract_signature_waived), 0);
 
   const influencerLogin = await login(influencerPayload.email, influencerPayload.cpf);
   assert.strictEqual(influencerLogin.status, 200);
@@ -136,6 +137,7 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
   assert.strictEqual(updateResponse.status, 200);
   assert.strictEqual(updateResponse.body.contato, '(21) 99123-4567');
   assert.strictEqual(Number(updateResponse.body.commission_rate), 15);
+  assert.strictEqual(Number(updateResponse.body.contract_signature_waived), 0);
 
   const newLogin = await login(influencerPayload.email, 'NovaSenha456');
   assert.strictEqual(newLogin.status, 200);
@@ -145,6 +147,74 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
     .delete(`/influenciadora/${influencerId}`)
     .set('Authorization', `Bearer ${masterToken}`);
   assert.strictEqual(deleteResponse.status, 200);
+});
+
+test('dispensa de contrato permite acesso sem aceite', async () => {
+  resetDb();
+
+  const masterToken = await authenticateMaster();
+
+  const createResponse = await request(app)
+    .post('/influenciadora')
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({ ...influencerPayload, contractSignatureWaived: true });
+
+  assert.strictEqual(createResponse.status, 201);
+  const influencerId = createResponse.body.id;
+  assert.ok(influencerId);
+  assert.strictEqual(Number(createResponse.body.contract_signature_waived), 1);
+  assert.ok(!createResponse.body.codigo_assinatura);
+
+  const influencerLogin = await login(influencerPayload.email, influencerPayload.cpf);
+  assert.strictEqual(influencerLogin.status, 200);
+  const influencerToken = influencerLogin.body.token;
+  assert.ok(influencerToken);
+
+  const profileResponse = await request(app)
+    .get(`/influenciadora/${influencerId}`)
+    .set('Authorization', `Bearer ${influencerToken}`);
+  assert.strictEqual(profileResponse.status, 200);
+
+  const acceptanceStatus = await request(app)
+    .get('/api/verificar-aceite')
+    .set('Authorization', `Bearer ${influencerToken}`);
+  assert.strictEqual(acceptanceStatus.status, 200);
+  assert.strictEqual(acceptanceStatus.body.aceito, true);
+  assert.strictEqual(acceptanceStatus.body.dispensado, true);
+
+  const contractResponse = await request(app)
+    .get('/api/contrato-assinado')
+    .set('Authorization', `Bearer ${influencerToken}`);
+  assert.strictEqual(contractResponse.status, 404);
+  assert.match(contractResponse.body.error, /dispensad/i);
+
+  const updateResponse = await request(app)
+    .put(`/influenciadora/${influencerId}`)
+    .set('Authorization', `Bearer ${masterToken}`)
+    .send({
+      ...influencerPayload,
+      contractSignatureWaived: false,
+      commissionPercent: influencerPayload.commissionPercent,
+      loginEmail: influencerPayload.email
+    });
+
+  assert.strictEqual(updateResponse.status, 200);
+  assert.strictEqual(Number(updateResponse.body.contract_signature_waived), 0);
+  assert.ok(updateResponse.body.codigo_assinatura);
+  assert.strictEqual(updateResponse.body.codigo_assinatura.length, 6);
+
+  const restrictedAccess = await request(app)
+    .get(`/influenciadora/${influencerId}`)
+    .set('Authorization', `Bearer ${influencerToken}`);
+  assert.strictEqual(restrictedAccess.status, 428);
+  assert.match(restrictedAccess.body.error, /Aceite do termo/i);
+
+  const pendingAcceptance = await request(app)
+    .get('/api/verificar-aceite')
+    .set('Authorization', `Bearer ${influencerToken}`);
+  assert.strictEqual(pendingAcceptance.status, 200);
+  assert.strictEqual(pendingAcceptance.body.aceito, false);
+  assert.ok(!pendingAcceptance.body.dispensado);
 });
 
 test('gestao de vendas vinculada a influenciadora', async () => {

@@ -84,6 +84,8 @@ const influencerBaseQuery = `
          i.cidade,
          i.estado,
          i.commission_rate,
+         i.contract_signature_code_generated_at,
+         i.contract_signature_waived,
          i.user_id,
          i.created_at,
          u.email AS login_email
@@ -111,6 +113,7 @@ const insertInfluencerStmt = db.prepare(`
     commission_rate,
     contract_signature_code_hash,
     contract_signature_code_generated_at,
+    contract_signature_waived,
     user_id
   ) VALUES (
     @nome,
@@ -131,6 +134,7 @@ const insertInfluencerStmt = db.prepare(`
     @commission_rate,
     @contract_signature_code_hash,
     @contract_signature_code_generated_at,
+    @contract_signature_waived,
     @user_id
   )
 `);
@@ -152,7 +156,8 @@ const updateInfluencerStmt = db.prepare(`
     bairro = @bairro,
     cidade = @cidade,
     estado = @estado,
-    commission_rate = @commission_rate
+    commission_rate = @commission_rate,
+    contract_signature_waived = @contract_signature_waived
   WHERE id = @id
 `);
 
@@ -172,6 +177,10 @@ const findInfluencerIdByInstagramStmt = db.prepare(
 );
 const findInfluencerIdByCpfStmt = db.prepare(
   "SELECT id FROM influenciadoras WHERE cpf IS NOT NULL AND REPLACE(REPLACE(cpf, '.', ''), '-', '') = ? LIMIT 1"
+);
+
+const updateInfluencerSignatureStmt = db.prepare(
+  'UPDATE influenciadoras SET contract_signature_code_hash = ?, contract_signature_code_generated_at = ? WHERE id = ?'
 );
 
 const insertSaleStmt = db.prepare(`
@@ -300,11 +309,6 @@ const findUserByIdentifier = (identifier) => {
   }
 
   const identifiers = listInfluencerLoginIdentifiersStmt.all();
-  const cpfMatch = identifiers.find((row) => normalizeDigits(row.cpf) === digits);
-  if (cpfMatch?.user_id) {
-    return findUserByIdStmt.get(cpfMatch.user_id) || null;
-  }
-
   const contactMatch = identifiers.find((row) => normalizeDigits(row.contato) === digits);
   if (contactMatch?.user_id) {
     return findUserByIdStmt.get(contactMatch.user_id) || null;
@@ -348,7 +352,61 @@ app.use('/api', aceiteRouter);
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : value);
 
+const truthyBooleanValues = new Set(['1', 'true', 'on', 'yes', 'sim', 'y', 's', 'dispensa', 'dispensado', 'dispensada']);
+const falsyBooleanValues = new Set(['0', 'false', 'off', 'no', 'nao', 'não', 'n']);
+
+const normalizeBooleanInput = (value) => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return undefined;
+    }
+    const asciiNormalized = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (truthyBooleanValues.has(asciiNormalized) || truthyBooleanValues.has(normalized)) {
+      return true;
+    }
+    if (falsyBooleanValues.has(asciiNormalized) || falsyBooleanValues.has(normalized)) {
+      return false;
+    }
+    return undefined;
+  }
+  return undefined;
+};
+
+const pickBooleanValue = (source, keys) => {
+  if (!source || typeof source !== 'object') {
+    return undefined;
+  }
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      return source[key];
+    }
+  }
+  return undefined;
+};
+
 const normalizeInfluencerPayload = (body) => {
+  const contractWaiverRaw = pickBooleanValue(body, [
+    'contractSignatureWaived',
+    'contract_signature_waived',
+    'contractWaived',
+    'waiveContractSignature',
+    'dispensaAssinaturaContrato',
+    'dispensaAssinatura',
+    'dispensaContrato',
+    'dispensarContrato'
+  ]);
+  const contractSignatureWaived = normalizeBooleanInput(contractWaiverRaw);
+
   const normalized = {
     nome: trimString(body.nome),
     instagram: trimString(body.instagram),
@@ -365,7 +423,8 @@ const normalizeInfluencerPayload = (body) => {
     bairro: trimString(body.bairro),
     cidade: trimString(body.cidade),
     estado: trimString(body.estado),
-    commissionPercent: trimString(body.commissionPercent ?? body.commission_rate ?? body.commission)
+    commissionPercent: trimString(body.commissionPercent ?? body.commission_rate ?? body.commission),
+    contractSignatureWaived
   };
 
   const missing = [];
@@ -444,26 +503,30 @@ const normalizeInfluencerPayload = (body) => {
 
   const estadoValue = normalized.estado ? normalized.estado.toUpperCase() : null;
 
-  return {
-    data: {
-      nome: normalized.nome,
-      instagram: normalized.instagram.startsWith('@') ? normalized.instagram : `@${normalized.instagram}`,
-      cpf: formattedCpf,
-      email: normalized.email || null,
-      contato: formattedContato,
-      cupom: normalized.cupom || null,
-      vendas_quantidade: vendasQuantidade,
-      vendas_valor: vendasValor,
-      cep: formattedCep,
-      numero: normalized.numero || null,
-      complemento: normalized.complemento || null,
-      logradouro: normalized.logradouro || null,
-      bairro: normalized.bairro || null,
-      cidade: normalized.cidade || null,
-      estado: estadoValue || null,
-      commission_rate: commissionRate
-    }
+  const data = {
+    nome: normalized.nome,
+    instagram: normalized.instagram.startsWith('@') ? normalized.instagram : `@${normalized.instagram}`,
+    cpf: formattedCpf,
+    email: normalized.email || null,
+    contato: formattedContato,
+    cupom: normalized.cupom || null,
+    vendas_quantidade: vendasQuantidade,
+    vendas_valor: vendasValor,
+    cep: formattedCep,
+    numero: normalized.numero || null,
+    complemento: normalized.complemento || null,
+    logradouro: normalized.logradouro || null,
+    bairro: normalized.bairro || null,
+    cidade: normalized.cidade || null,
+    estado: estadoValue || null,
+    commission_rate: commissionRate
   };
+
+  if (contractSignatureWaived != null) {
+    data.contract_signature_waived = contractSignatureWaived ? 1 : 0;
+  }
+
+  return { data };
 };
 
 const computeSaleTotals = (grossValue, discountValue, commissionPercent) => {
@@ -590,7 +653,15 @@ const influencerImportColumnAliases = {
   cidade: ['cidade', 'municipio'],
   estado: ['estado', 'uf'],
   vendasQuantidade: ['vendasquantidade', 'quantidadevendas', 'qtdvendas'],
-  vendasValor: ['vendasvalor', 'valorvendas', 'totalvendas']
+  vendasValor: ['vendasvalor', 'valorvendas', 'totalvendas'],
+  contractSignatureWaived: [
+    'dispensacontrato',
+    'dispensaassinatura',
+    'dispensa',
+    'waivecontract',
+    'contractwaived',
+    'dispensarcontrato'
+  ]
 };
 
 const analyzeInfluencerImport = (rawText) => {
@@ -621,7 +692,8 @@ const analyzeInfluencerImport = (rawText) => {
     'cidade',
     'estado',
     'vendasQuantidade',
-    'vendasValor'
+    'vendasValor',
+    'contractSignatureWaived'
   ];
 
   let delimiter = ',';
@@ -692,7 +764,8 @@ const analyzeInfluencerImport = (rawText) => {
       cidade: getCell('cidade'),
       estado: getCell('estado'),
       vendasQuantidade: getCell('vendasQuantidade'),
-      vendasValor: getCell('vendasValor')
+      vendasValor: getCell('vendasValor'),
+      contractSignatureWaived: getCell('contractSignatureWaived')
     };
 
     const displayRow = {
@@ -725,7 +798,8 @@ const analyzeInfluencerImport = (rawText) => {
       logradouro: raw.logradouro,
       bairro: raw.bairro,
       cidade: raw.cidade,
-      estado: raw.estado
+      estado: raw.estado,
+      contractSignatureWaived: raw.contractSignatureWaived
     };
 
     const { data, error } = normalizeInfluencerPayload(payload);
@@ -1208,7 +1282,7 @@ app.post('/login', async (req, res) => {
   const password = req.body?.password;
 
   if (!identifier || !password) {
-    return res.status(400).json({ error: 'Informe email, telefone ou CPF e a senha.' });
+    return res.status(400).json({ error: 'Informe email ou telefone e a senha.' });
   }
 
   const user = findUserByIdentifier(identifier);
@@ -1248,9 +1322,19 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
 
   const provisionalPassword = cpfDigits;
   const passwordHash = await bcrypt.hash(provisionalPassword, 10);
-  const signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-  const signatureCodeHash = await bcrypt.hash(signatureCode, 10);
-  const generatedAt = new Date().toISOString();
+  const contractSignatureWaivedValue = Number(data.contract_signature_waived ?? 0) === 1 ? 1 : 0;
+  data.contract_signature_waived = contractSignatureWaivedValue;
+  const waiveContract = contractSignatureWaivedValue === 1;
+
+  let signatureCode = null;
+  let signatureCodeHash = null;
+  let generatedAt = null;
+
+  if (!waiveContract) {
+    signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    signatureCodeHash = await bcrypt.hash(signatureCode, 10);
+    generatedAt = new Date().toISOString();
+  }
 
   try {
     const { influencerId } = createInfluencerTransaction(
@@ -1266,7 +1350,7 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
       ...influencer,
       login_email: loginEmail,
       senha_provisoria: provisionalPassword,
-      codigo_assinatura: signatureCode
+      codigo_assinatura: waiveContract ? null : signatureCode
     });
   } catch (err) {
     if (err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
@@ -1309,6 +1393,10 @@ app.put('/influenciadora/:id', authenticate, verificarAceite, async (req, res) =
     return res.status(400).json(error);
   }
 
+  if (data.contract_signature_waived == null) {
+    data.contract_signature_waived = Number(influencer.contract_signature_waived) === 1 ? 1 : 0;
+  }
+
   const loginEmail = trimString(req.body?.loginEmail);
   const loginPassword = req.body?.loginPassword;
 
@@ -1321,6 +1409,10 @@ app.put('/influenciadora/:id', authenticate, verificarAceite, async (req, res) =
   }
 
   try {
+    const previousWaived = Number(influencer.contract_signature_waived) === 1;
+    const newWaived = Number(data.contract_signature_waived) === 1;
+    let generatedSignatureCode = null;
+
     updateInfluencerStmt.run({ id, ...data });
 
     if (influencer.user_id) {
@@ -1336,8 +1428,24 @@ app.put('/influenciadora/:id', authenticate, verificarAceite, async (req, res) =
       }
     }
 
+    if (previousWaived && !newWaived) {
+      const newCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      const newHash = await bcrypt.hash(newCode, 10);
+      const generatedAt = new Date().toISOString();
+      updateInfluencerSignatureStmt.run(newHash, generatedAt, id);
+      generatedSignatureCode = newCode;
+    } else if (!previousWaived && newWaived) {
+      updateInfluencerSignatureStmt.run(null, null, id);
+    }
+
     const updated = findInfluencerByIdStmt.get(id);
-    return res.status(200).json(updated);
+    const responsePayload = { ...updated };
+    if (generatedSignatureCode) {
+      responsePayload.codigo_assinatura = generatedSignatureCode;
+    } else if (newWaived) {
+      responsePayload.codigo_assinatura = null;
+    }
+    return res.status(200).json(responsePayload);
   } catch (err) {
     if (err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return res.status(409).json({ error: 'Instagram ou email ja cadastrado.' });
@@ -1405,8 +1513,13 @@ app.post('/influenciadoras/import/confirm', authenticate, authorizeMaster, async
   try {
     const preparedRows = [];
     for (const row of validRows) {
+      const dataRow = { ...row.normalized.data };
+      if (dataRow.contract_signature_waived == null) {
+        dataRow.contract_signature_waived = 0;
+      }
+      const waived = Number(dataRow.contract_signature_waived) === 1;
       const baseRow = {
-        data: row.normalized.data,
+        data: dataRow,
         loginEmail: row.normalized.loginEmail || null,
         provisionalPassword: row.normalized.provisionalPassword || null,
         passwordHash: null,
@@ -1421,12 +1534,14 @@ app.post('/influenciadoras/import/confirm', authenticate, authorizeMaster, async
           baseRow.provisionalPassword && baseRow.provisionalPassword.length >= 6
             ? baseRow.provisionalPassword
             : String(crypto.randomInt(0, 100_000_000)).padStart(8, '0');
-        const signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
         baseRow.provisionalPassword = provisionalPassword;
         baseRow.passwordHash = await bcrypt.hash(provisionalPassword, 10);
-        baseRow.signatureCode = signatureCode;
-        baseRow.signatureHash = await bcrypt.hash(signatureCode, 10);
-        baseRow.generatedAt = new Date().toISOString();
+        if (!waived) {
+          const signatureCode = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+          baseRow.signatureCode = signatureCode;
+          baseRow.signatureHash = await bcrypt.hash(signatureCode, 10);
+          baseRow.generatedAt = new Date().toISOString();
+        }
       }
 
       preparedRows.push(baseRow);

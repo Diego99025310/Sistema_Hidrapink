@@ -251,6 +251,7 @@ if (client === 'mysql') {
         commission_rate DECIMAL(5,2) DEFAULT 0,
         contract_signature_code_hash VARCHAR(255),
         contract_signature_code_generated_at DATETIME,
+        contract_signature_waived TINYINT(1) DEFAULT 0,
         user_id INT UNIQUE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_influenciadoras_user FOREIGN KEY (user_id)
@@ -336,6 +337,9 @@ if (client === 'mysql') {
 
     if (!influencerColumnNames.has('contract_signature_code_generated_at')) {
       await db.exec('ALTER TABLE influenciadoras ADD COLUMN contract_signature_code_generated_at DATETIME;');
+    }
+    if (!influencerColumnNames.has('contract_signature_waived')) {
+      await db.exec('ALTER TABLE influenciadoras ADD COLUMN contract_signature_waived TINYINT(1) DEFAULT 0;');
     }
 
     const salesColumns = await db.all(
@@ -492,6 +496,7 @@ if (client === 'mysql') {
       commission_rate REAL DEFAULT 0,
       contract_signature_code_hash TEXT,
       contract_signature_code_generated_at DATETIME,
+      contract_signature_waived INTEGER DEFAULT 0,
       user_id INTEGER UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -545,6 +550,9 @@ if (client === 'mysql') {
             cidade,
             estado,
             commission_rate,
+            contract_signature_code_hash,
+            contract_signature_code_generated_at,
+            contract_signature_waived,
             user_id,
             created_at
           )
@@ -566,6 +574,9 @@ if (client === 'mysql') {
             NULLIF(${stringExpression('cidade')}, '') AS cidade,
             NULLIF(${stringExpression('estado')}, '') AS estado,
             ${commissionExpression} AS commission_rate,
+            NULLIF(${stringExpression('contract_signature_code_hash')}, '') AS contract_signature_code_hash,
+            NULLIF(${stringExpression('contract_signature_code_generated_at')}, '') AS contract_signature_code_generated_at,
+            CASE WHEN TRIM(COALESCE(${stringExpression('contract_signature_waived')}, '')) IN ('1', 'true', 'TRUE') THEN 1 ELSE 0 END AS contract_signature_waived,
             CASE WHEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} IS NOT NULL THEN ${hasColumn('user_id') ? 'user_id' : 'NULL'} ELSE NULL END AS user_id,
             created_at
           FROM influenciadoras;
@@ -590,6 +601,7 @@ if (client === 'mysql') {
 
     ensureColumn('contract_signature_code_hash', 'contract_signature_code_hash TEXT');
     ensureColumn('contract_signature_code_generated_at', 'contract_signature_code_generated_at DATETIME');
+    ensureColumn('contract_signature_waived', 'contract_signature_waived INTEGER DEFAULT 0');
   };
 
   const createSalesTable = (tableName = 'sales') => `

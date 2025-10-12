@@ -23,6 +23,22 @@
 
   const digitOnly = (value = '') => value.replace(/\D/g, '');
 
+  const parseBooleanFlag = (value) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return false;
+    const ascii = normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (['1', 'true', 'on', 'yes', 'sim', 'y', 's', 'dispensa', 'dispensado', 'dispensada'].includes(ascii)) {
+      return true;
+    }
+    if (['0', 'false', 'off', 'no', 'nao', 'n'].includes(ascii)) {
+      return false;
+    }
+    return false;
+  };
+
   const maskCPF = (value = '') => {
     const digits = digitOnly(value).slice(0, 11);
     if (!digits.length) return '';
@@ -116,31 +132,11 @@
         mode = 'phone';
       }
 
-      if (mode === 'auto') {
-        if (trimmed.startsWith('(') || trimmed.includes(')')) {
-          mode = 'phone';
-        } else if (trimmed.includes('.') || trimmed.includes('-')) {
-          mode = 'cpf';
-        } else if (digits.length > 11) {
-          mode = 'phone';
-        } else if (digits.length === 11) {
-          mode = digits[2] === '9' ? 'phone' : 'cpf';
-        } else if (digits.length === 10) {
-          mode = 'phone';
-        } else {
-          mode = 'phone';
-        }
+      if (mode !== 'phone') {
+        mode = 'phone';
       }
 
-      if (mode === 'cpf') {
-        return maskCPF(digits);
-      }
-
-      if (mode === 'phone') {
-        return maskPhone(digits);
-      }
-
-      return trimmed;
+      return maskPhone(digits);
     };
 
     format.reset = () => {
@@ -708,7 +704,8 @@
       cidade: getValue('cidade'),
       estado: getValue('estado'),
       loginEmail: getValue('loginEmail'),
-      loginPassword: getValue('loginPassword')
+      loginPassword: getValue('loginPassword'),
+      contractSignatureWaived: Boolean(form.elements.contractSignatureWaived?.checked)
     };
   };
 
@@ -779,6 +776,7 @@
     trimmed.estado = (trimmed.estado || '').trim().toUpperCase();
     trimmed.loginEmail = (trimmed.loginEmail || '').trim();
     trimmed.loginPassword = trimmed.loginPassword || '';
+    trimmed.contractSignatureWaived = parseBooleanFlag(trimmed.contractSignatureWaived);
     return trimmed;
   };
 
@@ -882,6 +880,11 @@
     setValue('cidade', data.cidade);
     setValue('estado', data.estado);
     setValue('loginEmail', data.login_email || '');
+    if (form.elements.contractSignatureWaived) {
+      form.elements.contractSignatureWaived.checked = parseBooleanFlag(
+        data.contract_signature_waived ?? data.contractSignatureWaived
+      );
+    }
     if (form.elements.loginPassword) {
       form.elements.loginPassword.value = '';
       form.elements.loginPassword.removeAttribute('aria-invalid');
@@ -1053,7 +1056,7 @@
       if (!validators.loginIdentifier(identifier) || !validators.password(password)) {
         setMessage(
           messageEl,
-          'Informe um email, telefone ou CPF valido e uma senha (minimo 6 caracteres).',
+          'Informe um email ou telefone valido e uma senha (minimo 6 caracteres).',
           'error'
         );
         focusFirstInvalidField(form);
@@ -1131,8 +1134,10 @@
     const loginEmailInput = form?.elements?.loginEmail || null;
     const cpfInput = form?.elements?.cpf || null;
     const signatureCodeInput = form?.elements?.signatureCode || null;
+    const contractWaiverInput = form?.elements?.contractSignatureWaived || null;
 
     let currentContractDocument = null;
+    let editingId = null;
 
     if (loginEmailInput) {
       loginEmailInput.setAttribute('readonly', '');
@@ -1148,13 +1153,41 @@
       if (signatureCodeInput) signatureCodeInput.value = '';
     };
 
+    const updateContractWaiverUI = ({ preserveMessage = false } = {}) => {
+      const waived = Boolean(contractWaiverInput?.checked);
+      if (signatureCodeInput) {
+        signatureCodeInput.placeholder = waived
+          ? editingId
+            ? 'Dispensado para esta influenciadora'
+            : 'Dispensado após o cadastro'
+          : 'Gerado automaticamente após o cadastro';
+        if (waived && (!editingId || !signatureCodeInput.value)) {
+          signatureCodeInput.value = '';
+        }
+      }
+      if (!waived) {
+        if (!preserveMessage && editingId && contractMessageEl) {
+          setMessage(contractMessageEl, '');
+        }
+        return;
+      }
+      if (contractMessageEl && !preserveMessage && editingId) {
+        setMessage(contractMessageEl, 'Assinatura do contrato dispensada para esta influenciadora.', 'info');
+      }
+      setMasterContractButtonsEnabled(false);
+    };
+
     const showGeneratedCredentials = (payload = {}) => {
       if (!credentialsBox) return;
+      const waived = parseBooleanFlag(
+        payload.contract_signature_waived ?? payload.contractSignatureWaived ?? payload.dispensaAssinaturaContrato
+      );
+      const signatureValue = waived ? 'Dispensado' : payload.codigo_assinatura || payload.contractSignatureCode || '';
       if (credentialCodeField) {
-        credentialCodeField.value = payload.codigo_assinatura || payload.contractSignatureCode || '';
+        credentialCodeField.value = signatureValue;
       }
       if (signatureCodeInput) {
-        signatureCodeInput.value = payload.codigo_assinatura || payload.contractSignatureCode || '';
+        signatureCodeInput.value = signatureValue;
       }
       if (credentialEmailField) {
         credentialEmailField.value = payload.login_email || payload.email_acesso || payload.loginEmail || '';
@@ -1250,6 +1283,14 @@
       contractSection.removeAttribute('hidden');
       if (contractDetailsEl) contractDetailsEl.innerHTML = '';
       setMasterContractButtonsEnabled(false);
+      if (contractWaiverInput?.checked) {
+        updateContractWaiverUI({ preserveMessage: true });
+        if (contractMessageEl) {
+          setMessage(contractMessageEl, 'Assinatura do contrato dispensada para esta influenciadora.', 'info');
+        }
+        currentContractDocument = null;
+        return;
+      }
       if (contractMessageEl) setMessage(contractMessageEl, 'Verificando contrato assinado...', 'info');
       currentContractDocument = null;
       try {
@@ -1265,7 +1306,11 @@
           return;
         }
         if (error.status === 404) {
-          setMessage(contractMessageEl, 'A influenciadora ainda não concluiu o aceite eletrônico.', 'info');
+          setMessage(
+            contractMessageEl,
+            error.message || 'A influenciadora ainda não concluiu o aceite eletrônico.',
+            'info'
+          );
           return;
         }
         setMessage(contractMessageEl, error.message || 'Não foi possível carregar o contrato assinado.', 'error');
@@ -1294,13 +1339,23 @@
     };
 
     syncCredentials();
+    updateContractWaiverUI({ preserveMessage: true });
 
     resetContractRecord({ hide: true });
 
+    contractWaiverInput?.addEventListener('change', () => {
+      const waived = Boolean(contractWaiverInput.checked);
+      if (editingId) {
+        resetContractRecord({ hide: false });
+      }
+      updateContractWaiverUI();
+      if (!waived && editingId) {
+        loadContractRecordForMaster(editingId);
+      }
+    });
+
     emailInput?.addEventListener('input', syncLoginEmail);
     cpfInput?.addEventListener('input', syncLoginPassword);
-
-    let editingId = null;
 
     const clearQueryId = () => {
       if (!window.history || !window.location) return;
@@ -1331,8 +1386,12 @@
         signatureCodeInput.placeholder = 'Gerado automaticamente após o cadastro';
         signatureCodeInput.value = '';
       }
+      if (contractWaiverInput) {
+        contractWaiverInput.checked = false;
+      }
       applyMasks();
       syncCredentials();
+      updateContractWaiverUI({ preserveMessage: true });
       if (clearMessage) setMessage(messageEl, '');
       clearQueryId();
       if (!preserveSummary) hideGeneratedCredentials();
@@ -1368,6 +1427,7 @@
         if (signatureCodeInput) {
           signatureCodeInput.value = '';
         }
+        updateContractWaiverUI();
         resetContractRecord({ hide: false });
         await loadContractRecordForMaster(numericId);
         setMessage(messageEl, 'Editando influenciadora selecionada.', 'info');
@@ -1433,7 +1493,8 @@
         ...normalized,
         commissionPercent: normalized.commissionPercent !== '' ? Number(normalized.commissionPercent) : undefined,
         loginEmail: normalized.loginEmail || undefined,
-        loginPassword: normalized.loginPassword || undefined
+        loginPassword: normalized.loginPassword || undefined,
+        contractSignatureWaived: normalized.contractSignatureWaived
       };
 
       const endpoint = currentEditId ? `/influenciadora/${currentEditId}` : '/influenciadora';
@@ -1442,7 +1503,10 @@
       try {
         const response = await apiFetch(endpoint, { method, body });
         if (currentEditId) {
-          setMessage(messageEl, 'Influenciadora atualizada com sucesso.', 'success');
+          const successMessage = response?.codigo_assinatura
+            ? `Influenciadora atualizada com sucesso. Novo código de assinatura: ${response.codigo_assinatura}.`
+            : 'Influenciadora atualizada com sucesso.';
+          setMessage(messageEl, successMessage, 'success');
           resetForm({ clearMessage: false });
         } else {
           setMessage(
@@ -2712,6 +2776,7 @@
     const downloadContractBtn = document.getElementById('downloadSignedContractButton');
 
     let currentContractRecord = null;
+    let contractWaived = false;
 
     const setContractButtonsEnabled = (enabled) => {
       if (viewContractBtn) {
@@ -2722,6 +2787,18 @@
         if (enabled) downloadContractBtn.removeAttribute('disabled');
         else downloadContractBtn.setAttribute('disabled', '');
       }
+    };
+
+    const applyContractWaiverState = () => {
+      if (!contractWaived) {
+        return false;
+      }
+      if (contractInfoEl) contractInfoEl.innerHTML = '';
+      setContractButtonsEnabled(false);
+      if (contractMessageEl) {
+        setMessage(contractMessageEl, 'A assinatura do contrato foi dispensada para sua conta.', 'info');
+      }
+      return true;
     };
 
     const renderContractInfo = (record) => {
@@ -2770,6 +2847,10 @@
       if (!contractMessageEl) return;
       if (contractInfoEl) contractInfoEl.innerHTML = '';
       setContractButtonsEnabled(false);
+      if (applyContractWaiverState()) {
+        currentContractRecord = null;
+        return;
+      }
       setMessage(contractMessageEl, 'Carregando contrato assinado...', 'info');
       currentContractRecord = null;
       try {
@@ -2785,7 +2866,11 @@
           return;
         }
         if (error.status === 404) {
-          setMessage(contractMessageEl, 'Ainda não encontramos um contrato assinado para este acesso.', 'info');
+          setMessage(
+            contractMessageEl,
+            error.message || 'Ainda não encontramos um contrato assinado para este acesso.',
+            'info'
+          );
           return;
         }
         setMessage(contractMessageEl, error.message || 'Não foi possível carregar o contrato assinado.', 'error');
@@ -2973,6 +3058,7 @@
 
     const loadInfluencer = async () => {
       renderInfluencerStatus(detailsEl, 'Carregando dados...');
+      contractWaived = false;
       try {
         const data = await apiFetch('/influenciadoras');
         const influencer = Array.isArray(data) ? data[0] : null;
@@ -2983,6 +3069,7 @@
           if (greetingEl) {
             greetingEl.textContent = 'Bem vinda, Pinklover.';
           }
+          await loadContractRecord();
           return;
         }
         renderInfluencerDetails(detailsEl, formatInfluencerDetails(influencer));
@@ -2990,7 +3077,16 @@
           const safeName = (influencer.nome || '').trim() || 'Pinklover';
           greetingEl.textContent = `Bem vinda, ${safeName}.`;
         }
-        loadInfluencerSales(influencer.id);
+        contractWaived = parseBooleanFlag(
+          influencer.contract_signature_waived ?? influencer.contractSignatureWaived
+        );
+        if (!contractWaived) {
+          setMessage(contractMessageEl, '', '');
+        } else {
+          applyContractWaiverState();
+        }
+        await loadInfluencerSales(influencer.id);
+        await loadContractRecord();
       } catch (error) {
         if (error.status === 401) {
           logout();
@@ -3000,13 +3096,17 @@
         if (greetingEl) {
           greetingEl.textContent = 'Bem vinda, Pinklover.';
         }
+        contractWaived = false;
+        setContractButtonsEnabled(false);
+        if (contractMessageEl) {
+          setMessage(contractMessageEl, 'Não foi possível carregar o contrato assinado.', 'error');
+        }
       }
     };
 
-    enforceTermAcceptance().then((allowed) => {
+    enforceTermAcceptance().then(async (allowed) => {
       if (!allowed) return;
-      loadInfluencer();
-      loadContractRecord();
+      await loadInfluencer();
     });
   };
 

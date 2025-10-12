@@ -135,6 +135,28 @@ header button:focus {
   font-size: 0.95rem;
 }
 
+.form-checkbox {
+  margin-top: 12px;
+}
+
+.form-checkbox .checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.form-checkbox .checkbox-field input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
+.form-checkbox .note {
+  margin: 6px 0 0 28px;
+  font-size: 0.9rem;
+}
+
 .link-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1179,7 +1201,7 @@ button.copy-button:focus {
 
   table tbody tr {
     display: grid;
-    gap: 10px;
+    gap: 5px;
     padding: 16px 18px;
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(251, 211, 219, 0.9));
@@ -1192,23 +1214,25 @@ button.copy-button:focus {
     background: none;
   }
 
-  table tbody td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0;
-    border: none;
-    font-size: 0.94rem;
-    color: var(--text-secondary);
-  }
+table tbody td {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  font-size: 0.94rem;
+  color: var(--text-secondary);
+  text-align: left;
+  word-break: break-word;
+}
 
-  table tbody td::before {
-    content: attr(data-label);
-    font-weight: 700;
-    color: var(--text-primary);
-    font-size: 0.92rem;
-  }
+table tbody td::before {
+  content: attr(data-label) ": ";
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  display: inline;
+}
 
   table tbody td:last-child {
     white-space: normal;
