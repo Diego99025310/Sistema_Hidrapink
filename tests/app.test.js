@@ -114,12 +114,14 @@ test('fluxo simples de influenciadora com login e exclusao', async () => {
   assert.ok(influencerId);
   assert.strictEqual(Number(createResponse.body.commission_rate), influencerPayload.commissionPercent);
   assert.strictEqual(createResponse.body.login_email, influencerPayload.email);
-  assert.strictEqual(createResponse.body.senha_provisoria, influencerPayload.cpf);
+  assert.ok(createResponse.body.senha_provisoria);
+  assert.strictEqual(createResponse.body.senha_provisoria.length, 6);
+  assert.match(createResponse.body.senha_provisoria, /^\d{6}$/);
   assert.ok(createResponse.body.codigo_assinatura);
   assert.strictEqual(createResponse.body.codigo_assinatura.length, 6);
   assert.strictEqual(Number(createResponse.body.contract_signature_waived), 0);
 
-  const influencerLogin = await login(influencerPayload.email, influencerPayload.cpf);
+  const influencerLogin = await login(createResponse.body.login_email, createResponse.body.senha_provisoria);
   assert.strictEqual(influencerLogin.status, 200);
   assert.strictEqual(influencerLogin.body.user.role, 'influencer');
   assert.ok(influencerLogin.body.token);
@@ -165,7 +167,12 @@ test('dispensa de contrato permite acesso sem aceite', async () => {
   assert.strictEqual(Number(createResponse.body.contract_signature_waived), 1);
   assert.ok(!createResponse.body.codigo_assinatura);
 
-  const influencerLogin = await login(influencerPayload.email, influencerPayload.cpf);
+  const provisionalPassword = createResponse.body.senha_provisoria;
+  assert.ok(provisionalPassword);
+  assert.strictEqual(provisionalPassword.length, 6);
+  assert.match(provisionalPassword, /^\d{6}$/);
+
+  const influencerLogin = await login(createResponse.body.login_email, provisionalPassword);
   assert.strictEqual(influencerLogin.status, 200);
   const influencerToken = influencerLogin.body.token;
   assert.ok(influencerToken);

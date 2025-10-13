@@ -46,6 +46,18 @@ const validators = {
   password: (value) => typeof value === 'string' && value.length >= 6
 };
 
+const PASSWORD_CHARSET = '0123456789';
+
+const generateRandomPassword = (length = 6) => {
+  let result = '';
+  const bytes = crypto.randomBytes(length);
+  for (let index = 0; index < length; index += 1) {
+    const randomIndex = bytes[index] % PASSWORD_CHARSET.length;
+    result += PASSWORD_CHARSET[randomIndex];
+  }
+  return result;
+};
+
 const roundCurrency = (value) => Math.round(Number(value) * 100) / 100;
 
 const parseCurrency = (value, fieldLabel) => {
@@ -1306,11 +1318,6 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
     return res.status(400).json(error);
   }
 
-  const cpfDigits = normalizeDigits(req.body?.cpf || data?.cpf || '');
-  if (cpfDigits.length !== 11) {
-    return res.status(400).json({ error: 'Informe um CPF valido para gerar a senha provisoria.' });
-  }
-
   const loginEmail = trimString(req.body?.loginEmail) || data.email;
   if (!loginEmail || !validators.email(loginEmail)) {
     return res.status(400).json({ error: 'Informe um email valido para acesso.' });
@@ -1320,7 +1327,14 @@ app.post('/influenciadora', authenticate, authorizeMaster, async (req, res) => {
     return res.status(409).json({ error: 'Email de login ja cadastrado.' });
   }
 
-  const provisionalPassword = cpfDigits;
+  const providedPasswordRaw =
+    req.body?.loginPassword ?? req.body?.provisionalPassword ?? req.body?.senha ?? req.body?.password;
+  const providedPassword = providedPasswordRaw == null ? '' : String(providedPasswordRaw).trim();
+  if (providedPassword && !validators.password(providedPassword)) {
+    return res.status(400).json({ error: 'Senha de acesso deve ter ao menos 6 caracteres.' });
+  }
+
+  const provisionalPassword = providedPassword || generateRandomPassword(6);
   const passwordHash = await bcrypt.hash(provisionalPassword, 10);
   const contractSignatureWaivedValue = Number(data.contract_signature_waived ?? 0) === 1 ? 1 : 0;
   data.contract_signature_waived = contractSignatureWaivedValue;
@@ -1444,6 +1458,12 @@ app.put('/influenciadora/:id', authenticate, verificarAceite, async (req, res) =
       responsePayload.codigo_assinatura = generatedSignatureCode;
     } else if (newWaived) {
       responsePayload.codigo_assinatura = null;
+    }
+    if (loginEmail) {
+      responsePayload.login_email = loginEmail;
+    }
+    if (loginPassword) {
+      responsePayload.senha_provisoria = loginPassword;
     }
     return res.status(200).json(responsePayload);
   } catch (err) {

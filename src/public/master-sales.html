@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registrar venda | Sistema Influenciadoras</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="master-sales">
+    <div class="container">
+      <header>
+        <h1>Registrar venda</h1>
+        <p>Associe as vendas aos cupons das influenciadoras.</p>
+        <button type="button" data-action="logout">Sair</button>
+      </header>
+
+      <section class="card">
+        <div class="link-grid" style="margin-bottom:16px;">
+          <a class="link-card" href="master-create.html">Cadastrar</a>
+          <a class="link-card" href="master-consult.html">Consulta</a>
+          <a class="link-card" href="master-list.html">Lista cadastrada</a>
+        </div>
+        <form id="createSaleForm">
+          <div class="form-grid compact">
+            <label>Pedido*<input name="orderNumber" type="text" required /></label>
+            <label>
+              Cupom*
+              <select name="saleCoupon" id="saleCouponSelect" required>
+                <option value="">Selecione um cupom</option>
+              </select>
+            </label>
+            <label>Data*<input name="saleDate" type="date" required /></label>
+            <label>Valor bruto*<input name="grossValue" type="number" min="0" step="0.01" required /></label>
+            <label>Desconto<input name="discountValue" type="number" min="0" step="0.01" /></label>
+            <label>Valor liquido<input name="netValue" type="number" min="0" step="0.01" readonly /></label>
+            <label>Comissao calculada<input name="commissionValue" type="number" min="0" step="0.01" readonly /></label>
+          </div>
+          <div class="button-row">
+            <button type="submit">Registrar venda</button>
+            <button type="button" class="secondary-button" id="cancelSaleEditButton">Cancelar edicao</button>
+          </div>
+        </form>
+        <div id="salesMessage" class="message" aria-live="polite"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px;">
+          <div>
+            <h2>Vendas cadastradas</h2>
+            <p class="note">Use os botoes para editar ou excluir.</p>
+          </div>
+          <button type="button" id="reloadSalesButton">Recarregar vendas</button>
+        </div>
+        <div class="table-wrapper">
+          <table id="salesTable">
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Cupom</th>
+                <th>Data</th>
+                <th>Valor bruto</th>
+                <th>Desconto</th>
+                <th>Valor liquido</th>
+                <th>Comissão</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="salesSummary" class="summary"></div>
+      </section>
+      <section class="card" id="bulkSalesSection">
+        <h2>Importar vendas em massa</h2>
+        <p class="note">
+          Cole os dados seguindo as colunas: Pedido, Cupom, Data, Valor bruto, Desconto. Em seguida, analise os
+          resultados e confirme o salvamento quando estiver tudo certo.
+        </p>
+        <label class="stacked">
+          Dados das vendas
+          <textarea
+            id="salesImportInput"
+            rows="8"
+            placeholder="Pedido&#9;Cupom&#9;Data&#9;Valor bruto&#9;Desconto"
+          ></textarea>
+        </label>
+        <div class="button-row">
+          <button type="button" id="analyzeSalesImportButton">Analisar dados</button>
+          <button type="button" class="secondary-button" id="clearSalesImportButton">Limpar</button>
+        </div>
+        <div id="salesImportMessage" class="message" aria-live="polite"></div>
+        <div class="table-wrapper">
+          <table id="salesImportTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Pedido</th>
+                <th>Cupom</th>
+                <th>Data</th>
+                <th>Valor bruto</th>
+                <th>Desconto</th>
+                <th>Valor liquido</th>
+                <th>Comissão</th>
+                <th>Observações</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="salesImportSummary" class="summary"></div>
+        <div class="button-row">
+          <button type="button" id="confirmSalesImportButton" disabled>
+            Salvar pedidos importados
+          </button>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

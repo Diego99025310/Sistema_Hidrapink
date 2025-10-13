@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login | Sistema Influenciadoras</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="login">
+    <div class="container">
+      <section class="card">
+        <h2>Login Pinklover</h2>
+        <form id="loginForm">
+          <label>
+            Email ou telefone
+            <input
+              id="loginEmail"
+              name="email"
+              type="text"
+              placeholder="Digite seu email ou telefone"
+              required
+              autocomplete="username"
+            />
+          </label>
+          <label>
+            Senha
+            <input id="loginPassword" name="password" type="password" placeholder="********" required minlength="6" />
+          </label>
+          <button type="submit">Entrar</button>
+        </form>
+        <div id="loginMessage" class="message" aria-live="polite"></div>
+      </section>
+
+    </div>
+  </body>
+</html>

@@ -21,205 +21,7 @@
     }
   })();
 
-  const fallbackPersistentStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {}
-  };
-
-  const persistentStorage = (() => {
-    try {
-      const candidate = window.localStorage;
-      if (!candidate) return fallbackPersistentStorage;
-      const testKey = '__hidrapink_persist_test__';
-      candidate.setItem(testKey, '1');
-      candidate.removeItem(testKey);
-      return candidate;
-    } catch (error) {
-      return fallbackPersistentStorage;
-    }
-  })();
-
-  const createCredentialsStore = () => {
-    const STORAGE_KEY = 'hidrapink:influencerCredentials:v1';
-    let cache = null;
-
-    const load = () => {
-      if (cache) return cache;
-      const raw = persistentStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        cache = {};
-        return cache;
-      }
-      try {
-        const parsed = JSON.parse(raw);
-        cache = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-      } catch (error) {
-        cache = {};
-      }
-      return cache;
-    };
-
-    const persist = (data) => {
-      cache = data;
-      try {
-        persistentStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-      } catch (error) {
-        // Ignora falhas de persistência (modo privado, cota excedida, etc.)
-      }
-    };
-
-    const sanitizeRecord = (record = {}) => {
-      const result = {};
-      Object.entries(record).forEach(([key, value]) => {
-        if (value == null) return;
-        if (typeof value === 'string') {
-          const trimmed = value.trim();
-          if (!trimmed) return;
-          result[key] = trimmed;
-          return;
-        }
-        result[key] = value;
-      });
-      return result;
-    };
-
-    const resolveKey = (id) => {
-      const numeric = Number(id);
-      if (!Number.isInteger(numeric) || numeric <= 0) return null;
-      return String(numeric);
-    };
-
-    return {
-      get(id) {
-        const key = resolveKey(id);
-        if (!key) return null;
-        const store = load();
-        return store[key] || null;
-      },
-      set(id, values = {}) {
-        const key = resolveKey(id);
-        if (!key) return null;
-        const sanitized = sanitizeRecord(values);
-        if (!Object.keys(sanitized).length) {
-          const store = load();
-          return store[key] || null;
-        }
-        const store = load();
-        const nextEntry = { ...(store[key] || {}), ...sanitized };
-        store[key] = nextEntry;
-        persist(store);
-        return nextEntry;
-      },
-      remove(id) {
-        const key = resolveKey(id);
-        if (!key) return;
-        const store = load();
-        if (store[key]) {
-          delete store[key];
-          persist(store);
-        }
-      }
-    };
-  };
-
-  const influencerCredentialsStore = createCredentialsStore();
-
-  const rememberInfluencerCredentials = (payload = {}) => {
-    const id = payload.id ?? payload.influencer_id ?? payload.influencerId;
-    const entry = {
-      senha_provisoria:
-        payload.senha_provisoria ??
-        payload.provisionalPassword ??
-        payload.loginPassword ??
-        null,
-      login_email: payload.login_email ?? payload.loginEmail ?? null,
-      contato: (() => {
-        const rawContact = payload.contato ?? payload.contact;
-        if (rawContact == null) return null;
-        const digits = digitOnly(String(rawContact));
-        return digits || null;
-      })(),
-      nome: payload.nome ?? payload.name ?? null
-    };
-    const sanitized = Object.fromEntries(
-      Object.entries(entry).filter(([, value]) => {
-        if (value == null) return false;
-        if (typeof value === 'string') {
-          return value.trim().length > 0;
-        }
-        return true;
-      })
-    );
-    if (!id || !Object.keys(sanitized).length) {
-      return;
-    }
-    sanitized.updatedAt = new Date().toISOString();
-    influencerCredentialsStore.set(id, sanitized);
-  };
-
   const digitOnly = (value = '') => value.replace(/\D/g, '');
-
-  const NUMERIC_PASSWORD_CHARSET = '0123456789';
-
-  const generateNumericPassword = (length = 6) => {
-    if (length <= 0) return '';
-    if (window?.crypto?.getRandomValues) {
-      const randomValues = new Uint32Array(length);
-      window.crypto.getRandomValues(randomValues);
-      let result = '';
-      randomValues.forEach((value) => {
-        result += NUMERIC_PASSWORD_CHARSET[value % NUMERIC_PASSWORD_CHARSET.length];
-      });
-      return result;
-    }
-    let fallback = '';
-    for (let index = 0; index < length; index += 1) {
-      const randomIndex = Math.floor(Math.random() * NUMERIC_PASSWORD_CHARSET.length);
-      fallback += NUMERIC_PASSWORD_CHARSET[randomIndex];
-    }
-    return fallback;
-  };
-
-  const prepareWhatsappPhone = (value) => {
-    const digits = digitOnly(value);
-    if (!digits) return '';
-    if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
-      return digits;
-    }
-    if (digits.length === 10 || digits.length === 11) {
-      return `55${digits}`;
-    }
-    return digits;
-  };
-
-  const buildWhatsappMessageContext = ({ name = '', contact = '', password = '', loginOverride = '' } = {}) => {
-    const displayName = String(name ?? '').trim() || 'influenciadora';
-    const contactDigits = digitOnly(contact);
-    const loginFallback = String(loginOverride ?? '').trim();
-    const loginDisplay = contactDigits ? maskPhone(contactDigits) : loginFallback || 'informar o celular';
-    const passwordDisplay = String(password ?? '').trim();
-
-    const messageLines = [
-      `Olá, ${displayName}`,
-      '',
-      'Segue seu login e senha para acesso ao painel Hidrapink.',
-      '',
-      'Site: https://painel.hidrapink.com.br/',
-      `Login: ${loginDisplay}`,
-      `Senha: ${passwordDisplay || 'gerada automaticamente no cadastro'}`,
-      '',
-      'Atenciosamente,',
-      'Hidrapink'
-    ];
-
-    const message = messageLines.join('\n');
-    const whatsappPhone = prepareWhatsappPhone(contactDigits);
-    const baseUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}` : 'https://wa.me/';
-    const url = message ? `${baseUrl}?text=${encodeURIComponent(message)}` : '';
-
-    return { message, url, contactDigits, loginDisplay, password: passwordDisplay, name: displayName };
-  };
 
   const parseBooleanFlag = (value) => {
     if (value === undefined || value === null) return false;
@@ -1353,9 +1155,29 @@
       loginEmailInput.setAttribute('readonly', '');
     }
 
+    const randomPasswordCharset = '0123456789';
+
+    const generateProvisionalPassword = (length = 6) => {
+      if (window?.crypto?.getRandomValues) {
+        const randomValues = new Uint32Array(length);
+        window.crypto.getRandomValues(randomValues);
+        let result = '';
+        randomValues.forEach((value) => {
+          result += randomPasswordCharset[value % randomPasswordCharset.length];
+        });
+        return result;
+      }
+      let fallback = '';
+      for (let index = 0; index < length; index += 1) {
+        const randomIndex = Math.floor(Math.random() * randomPasswordCharset.length);
+        fallback += randomPasswordCharset[randomIndex];
+      }
+      return fallback;
+    };
+
     const assignGeneratedPassword = (value) => {
       if (!passwordInput) return '';
-      const newValue = value || generateNumericPassword();
+      const newValue = value || generateProvisionalPassword();
       passwordInput.value = newValue;
       passwordInput.removeAttribute('aria-invalid');
       return newValue;
@@ -1375,6 +1197,18 @@
       }
     };
 
+    const prepareWhatsappPhone = (value) => {
+      const digits = digitOnly(value);
+      if (!digits) return '';
+      if ((digits.length === 12 || digits.length === 13) && digits.startsWith('55')) {
+        return digits;
+      }
+      if (digits.length === 10 || digits.length === 11) {
+        return `55${digits}`;
+      }
+      return digits;
+    };
+
     const clearWhatsappMessage = () => {
       lastWhatsappContext = { message: '', url: '', contactDigits: '' };
       if (whatsappPreview) whatsappPreview.value = '';
@@ -1389,8 +1223,11 @@
     const updateWhatsappMessage = (payload = {}) => {
       if (!whatsappPreview) return;
 
-      const name = (payload.nome ?? payload.name ?? form?.elements?.nome?.value ?? '').toString().trim();
-      const contactValue = payload.contato ?? payload.contact ?? form?.elements?.contato?.value ?? '';
+      const name =
+        (payload.nome ?? payload.name ?? form?.elements?.nome?.value ?? '')
+          .toString()
+          .trim();
+      const contactDigits = digitOnly(payload.contato ?? payload.contact ?? form?.elements?.contato?.value ?? '');
       const loginEmailValue = (payload.login_email ?? payload.loginEmail ?? loginEmailInput?.value ?? '').trim();
       const provisionalPasswordValue = (
         payload.senha_provisoria ??
@@ -1399,25 +1236,35 @@
         passwordInput?.value ??
         ''
       ).toString();
+      const passwordDisplay = provisionalPasswordValue.trim();
 
-      const context = buildWhatsappMessageContext({
-        name,
-        contact: contactValue,
-        password: provisionalPasswordValue,
-        loginOverride: loginEmailValue
-      });
+      const loginDisplay = contactDigits ? maskPhone(contactDigits) : 'informar o celular';
 
-      whatsappPreview.value = context.message;
-      lastWhatsappContext = {
-        message: context.message,
-        url: context.url,
-        contactDigits: context.contactDigits
-      };
+      const messageLines = [
+        `Olá, ${name || 'influenciadora'}`,
+        '',
+        'Segue seu login e senha para acesso ao painel Hidrapink.',
+        '',
+        'Site: https://painel.hidrapink.com.br/',
+        `Login: ${loginDisplay}`,
+        `Senha: ${passwordDisplay || 'gerada automaticamente no cadastro'}`,
+        '',
+        'Atenciosamente,',
+        'Hidrapink'
+      ];
+
+      const message = messageLines.join('\n');
+      const whatsappPhone = prepareWhatsappPhone(contactDigits);
+      const baseUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}` : 'https://wa.me/';
+      const url = message ? `${baseUrl}?text=${encodeURIComponent(message)}` : '';
+
+      whatsappPreview.value = message;
+      lastWhatsappContext = { message, url, contactDigits };
 
       if (openWhatsappBtn) {
-        if (context.url) {
+        if (url) {
           openWhatsappBtn.removeAttribute('disabled');
-          openWhatsappBtn.dataset.whatsappUrl = context.url;
+          openWhatsappBtn.dataset.whatsappUrl = url;
         } else {
           openWhatsappBtn.setAttribute('disabled', '');
           delete openWhatsappBtn.dataset.whatsappUrl;
@@ -1425,12 +1272,10 @@
       }
 
       if (whatsappHint) {
-        if (!context.message) {
+        if (!message) {
           whatsappHint.textContent = defaultWhatsappHint;
-        } else if (context.contactDigits) {
-          whatsappHint.textContent = `O link abrirá uma conversa com ${maskPhone(
-            context.contactDigits
-          )}. Revise antes de enviar.`;
+        } else if (contactDigits) {
+          whatsappHint.textContent = `O link abrirá uma conversa com ${maskPhone(contactDigits)}. Revise antes de enviar.`;
         } else if (loginEmailValue) {
           whatsappHint.textContent =
             'Inclua um telefone em "Contato" para abrir a conversa automaticamente ou copie a mensagem para enviar.';
@@ -1535,10 +1380,6 @@
       credentialsBox.removeAttribute('hidden');
       lastCredentialsPayload = { ...payload };
       updateWhatsappMessage({ ...payload });
-      rememberInfluencerCredentials({
-        ...payload,
-        contato: payload.contato ?? form?.elements?.contato?.value ?? ''
-      });
     };
 
     const setMasterContractButtonsEnabled = (enabled) => {
@@ -1984,12 +1825,6 @@
 
     let influencers = [];
 
-    const normalizeString = (value) => {
-      if (value == null) return '';
-      const stringValue = String(value).trim();
-      return stringValue;
-    };
-
     const renderList = () => {
       if (!listContainer) return;
       listContainer.innerHTML = '';
@@ -2007,7 +1842,6 @@
           <div class="actions">
             <button type="button" data-action="edit" data-id="${item.id}">Editar</button>
             <button type="button" data-action="delete" data-id="${item.id}">Excluir</button>
-            <button type="button" data-action="whatsapp" data-id="${item.id}">WhatsApp</button>
           </div>
         `;
         fragment.appendChild(card);
@@ -2015,113 +1849,10 @@
       listContainer.appendChild(fragment);
     };
 
-    const buildUpdatePayloadFromInfluencer = (item, overrides = {}) => {
-      if (!item) return null;
-      const payload = {
-        nome: item.nome ?? '',
-        instagram: item.instagram ?? '',
-        cpf: item.cpf ?? '',
-        email: item.email ?? '',
-        contato: item.contato ?? '',
-        cupom: item.cupom ?? '',
-        vendasQuantidade:
-          item.vendas_quantidade != null && item.vendas_quantidade !== ''
-            ? String(item.vendas_quantidade)
-            : '',
-        vendasValor:
-          item.vendas_valor != null && item.vendas_valor !== ''
-            ? String(item.vendas_valor)
-            : '',
-        cep: item.cep ?? '',
-        numero: item.numero ?? '',
-        complemento: item.complemento ?? '',
-        logradouro: item.logradouro ?? '',
-        bairro: item.bairro ?? '',
-        cidade: item.cidade ?? '',
-        estado: item.estado ?? '',
-        commissionPercent:
-          item.commission_rate != null && item.commission_rate !== ''
-            ? String(item.commission_rate)
-            : '',
-        contractSignatureWaived: Number(item.contract_signature_waived) === 1
-      };
-      return { ...payload, ...overrides };
-    };
-
-    const openWhatsappForInfluencer = (item) => {
-      if (!item) return;
-
-      const storedCredentials = influencerCredentialsStore.get(item.id);
-      const storedContact = normalizeString(storedCredentials?.contato);
-      const storedPassword = normalizeString(storedCredentials?.senha_provisoria);
-      const storedLogin = normalizeString(storedCredentials?.login_email);
-      const storedName = normalizeString(storedCredentials?.nome);
-
-      const contactValue = normalizeString(item.contato) || storedContact;
-      const currentPassword = normalizeString(item.senha_provisoria) || storedPassword;
-      const loginOverride = normalizeString(item.login_email) || storedLogin;
-      const displayName = normalizeString(item.nome) || storedName;
-
-      if (!currentPassword) {
-        setMessage(
-          messageEl,
-          'Senha provisória não encontrada. Gere uma nova na edição do cadastro antes de enviar a mensagem.',
-          'error'
-        );
-        return;
-      }
-
-      rememberInfluencerCredentials({
-        id: item.id,
-        nome: displayName,
-        contato: contactValue,
-        login_email: loginOverride,
-        senha_provisoria: currentPassword
-      });
-
-      const context = buildWhatsappMessageContext({
-        name: displayName,
-        contact: contactValue,
-        password: currentPassword,
-        loginOverride
-      });
-
-      if (!context.message) {
-        setMessage(messageEl, 'Não foi possível montar a mensagem para o WhatsApp.', 'error');
-        return;
-      }
-
-      const url = context.url || 'https://wa.me/';
-      const popup = window.open(url, '_blank', 'noopener');
-      if (!popup) {
-        setMessage(
-          messageEl,
-          'Não foi possível abrir o WhatsApp automaticamente. Verifique o bloqueio de pop-ups e tente novamente.',
-          'error'
-        );
-        return;
-      }
-
-      setMessage(messageEl, 'Mensagem pronta! O WhatsApp abrirá em uma nova aba.', 'success');
-    };
-
     const load = async () => {
       setMessage(messageEl, 'Carregando influenciadoras...', 'info');
       try {
-        const data = await fetchAllInfluencers();
-        influencers = data.map((item) => {
-          if (!item || item.id == null) return item;
-          const remembered = influencerCredentialsStore.set(item.id, {
-            contato: item.contato,
-            login_email: item.login_email,
-            nome: item.nome
-          });
-          const storedPassword = normalizeString(remembered?.senha_provisoria);
-          if (!normalizeString(item.senha_provisoria) && storedPassword) {
-            return { ...item, senha_provisoria: storedPassword };
-          }
-          return item;
-        });
+        influencers = await fetchAllInfluencers();
         renderList();
         if (!influencers.length) {
           setMessage(messageEl, 'Nenhuma influenciadora cadastrada ainda.', 'info');
@@ -2151,7 +1882,6 @@
           try {
             await apiFetch(`/influenciadora/${id}`, { method: 'DELETE' });
             setMessage(messageEl, 'Influenciadora removida com sucesso.', 'success');
-            influencerCredentialsStore.remove(id);
             await load();
           } catch (error) {
             if (error.status === 401) {
@@ -2161,13 +1891,6 @@
             setMessage(messageEl, error.message || 'Nao foi possivel excluir a influenciadora.', 'error');
           }
         })();
-      } else if (action === 'whatsapp') {
-        const target = influencers.find((entry) => entry.id === id);
-        if (!target) {
-          setMessage(messageEl, 'Não foi possível localizar esta influenciadora.', 'error');
-          return;
-        }
-        openWhatsappForInfluencer(target);
       }
     });
 

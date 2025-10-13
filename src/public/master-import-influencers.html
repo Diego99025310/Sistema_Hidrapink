@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Importar influenciadoras | Sistema Influenciadoras</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="master-import-influencers">
+    <div class="container">
+      <header>
+        <h1>Importar influenciadoras</h1>
+        <p>Carregue um arquivo CSV para cadastrar várias influenciadoras de uma só vez.</p>
+        <button type="button" data-action="logout">Sair</button>
+      </header>
+
+      <section class="card">
+        <div class="link-grid" style="margin-bottom: 16px;">
+          <a class="link-card" href="master-create.html">Cadastrar influenciadora</a>
+          <a class="link-card" href="master-consult.html">Consulta</a>
+          <a class="link-card" href="master-list.html">Lista cadastrada</a>
+          <a class="link-card" href="master-sales.html">Registrar venda</a>
+        </div>
+
+        <div class="import-guidelines">
+          <span class="section-title">Sequência das colunas esperadas</span>
+          <p class="note">
+            Utilize um arquivo CSV separado por vírgula (.csv). Todos os campos podem ficar em branco; preencha apenas
+            as informações disponíveis para cada influenciadora.
+          </p>
+          <ol id="influencerColumnList" class="import-columns" aria-live="polite"></ol>
+          <div class="import-guidelines__actions">
+            <button type="button" id="downloadInfluencerTemplate">Baixar modelo de CSV</button>
+            <a class="secondary-button" href="master-create.html">Cadastrar individualmente</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Arquivo para importação</h2>
+        <form id="influencerImportForm" data-form="import-influencers">
+          <div class="form-grid compact">
+            <label>Selecione o arquivo CSV*<input id="influencerImportFile" type="file" accept=".csv,text/csv" required /></label>
+          </div>
+          <div class="import-actions">
+            <button type="button" id="analyzeInfluencerImport">Analisar arquivo</button>
+            <button type="button" class="secondary-button" id="confirmInfluencerImport" disabled>Confirmar importação</button>
+            <button type="button" class="link-button" id="clearInfluencerImport">Limpar seleção</button>
+          </div>
+          <div id="influencerImportMessage" class="message" aria-live="polite"></div>
+        </form>
+
+        <div id="influencerImportSummary" class="summary" aria-live="polite"></div>
+
+        <div class="table-wrapper" aria-live="polite">
+          <table id="influencerImportTable">
+            <thead>
+              <tr>
+                <th>Linha</th>
+                <th>Nome</th>
+                <th>Instagram</th>
+                <th>Email de acesso</th>
+                <th>CPF</th>
+                <th>Cupom</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty">
+                <td colspan="7">Nenhum arquivo analisado ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="influencerImportResult" class="import-result" aria-live="polite"></div>
+      </section>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel Influenciadora | HidraPink</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: 'Outfit', sans-serif;
+        --color-primary: #e4447a;
+        --color-secondary: #f07999;
+        --color-soft: #fbd3db;
+        --color-text: #333333;
+        --color-surface: rgba(255, 255, 255, 0.82);
+        --color-surface-strong: rgba(255, 255, 255, 0.94);
+        --shadow-soft: 0 1.5rem 3rem rgba(228, 68, 122, 0.16);
+        --shadow-hero: 0 2rem 4rem rgba(228, 68, 122, 0.22);
+        --radius-lg: 1.5rem;
+        --transition: 180ms ease;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: inherit;
+        background: linear-gradient(160deg, var(--color-soft) 0%, #ffffff 100%);
+        color: var(--color-text);
+      }
+
+      body[data-page='influencer'] {
+        display: flex;
+        justify-content: center;
+        padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 6vw, 4rem);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      h1 {
+        font-size: clamp(1.8rem, 5vw, 3rem);
+      }
+
+      h2 {
+        font-size: clamp(1.5rem, 4vw, 2.25rem);
+      }
+
+      h3 {
+        font-size: clamp(1.25rem, 3vw, 1.75rem);
+      }
+
+      p {
+        margin: 0;
+        font-size: clamp(1rem, 2vw, 1.125rem);
+        line-height: 1.6;
+      }
+
+      small {
+        font-size: clamp(0.875rem, 1.5vw, 1rem);
+        line-height: 1.6;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      body[data-page='influencer'] .container {
+        width: min(100%, 78rem);
+        display: grid;
+        gap: clamp(1.5rem, 4vw, 2.75rem);
+      }
+
+      .influencer-hero {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        gap: clamp(1rem, 3vw, 1.5rem);
+        padding: clamp(2rem, 6vw, 3.5rem);
+        border-radius: var(--radius-lg);
+        background: radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.8), transparent 65%),
+          linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+        color: #ffffff;
+        box-shadow: var(--shadow-hero);
+        justify-items: center;
+        text-align: center;
+      }
+
+      .influencer-hero::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.4), transparent 55%),
+          radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.3), transparent 60%);
+        pointer-events: none;
+      }
+
+      .influencer-hero > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .hero-content {
+        display: grid;
+        gap: clamp(0.5rem, 2vw, 1rem);
+        width: min(100%, 42rem);
+        margin-inline: auto;
+      }
+
+      .hero-eyebrow {
+        font-size: clamp(0.875rem, 2vw, 1rem);
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+
+      .dashboard-grid.influencer-layout {
+        display: grid;
+        gap: clamp(1.5rem, 4vw, 2.5rem);
+      }
+
+      .card {
+        display: grid;
+        gap: clamp(1rem, 3vw, 1.75rem);
+        padding: clamp(1.5rem, 5vw, 2.5rem);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        backdrop-filter: saturate(115%) blur(18px);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .card-headline {
+        display: grid;
+        gap: clamp(0.5rem, 2vw, 0.75rem);
+        text-align: center;
+      }
+
+      .card-headline p {
+        color: rgba(51, 51, 51, 0.72);
+      }
+
+      .info-grid {
+        display: grid;
+        gap: clamp(1rem, 4vw, 1.5rem);
+      }
+
+      .info-grid dl {
+        margin: 0;
+        display: grid;
+        gap: 0.35rem;
+        padding: clamp(1rem, 3vw, 1.5rem);
+        border-radius: 1rem;
+        background: var(--color-surface-strong);
+        border: 0.08rem solid rgba(228, 68, 122, 0.22);
+        box-shadow: 0 1rem 2.5rem rgba(228, 68, 122, 0.12);
+      }
+
+      .info-grid dt {
+        font-size: clamp(0.875rem, 2vw, 1rem);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(51, 51, 51, 0.6);
+      }
+
+      .info-grid dd {
+        margin: 0;
+        font-size: clamp(1rem, 2.5vw, 1.25rem);
+        font-weight: 600;
+      }
+
+      .card-actions {
+        display: grid;
+        gap: clamp(0.75rem, 3vw, 1rem);
+      }
+
+      .card-actions button,
+      .card-actions .button-logout {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 2.75rem;
+        padding: clamp(0.75rem, 2.5vw, 1rem) clamp(1.5rem, 4vw, 2rem);
+        border-radius: 999px;
+        border: none;
+        font-size: clamp(1rem, 2vw, 1.125rem);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+      }
+
+      #viewSignedContractButton {
+        background: #ffffff;
+        color: var(--color-primary);
+        box-shadow: 0 1.2rem 2.8rem rgba(228, 68, 122, 0.18);
+      }
+
+      #viewSignedContractButton:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .button-logout {
+        background: var(--color-primary);
+        color: #ffffff;
+        box-shadow: 0 1.2rem 2.8rem rgba(228, 68, 122, 0.28);
+      }
+
+      .card-actions button:not(:disabled):hover,
+      .card-actions button:not(:disabled):focus-visible {
+        transform: translateY(-0.12rem);
+      }
+
+      .message {
+        padding: clamp(0.75rem, 2.5vw, 1rem) clamp(1rem, 3vw, 1.5rem);
+        border-radius: 0.85rem;
+        background: rgba(251, 211, 219, 0.7);
+        border: 0.08rem solid rgba(228, 68, 122, 0.25);
+        font-size: clamp(1rem, 2vw, 1.1rem);
+      }
+
+      .sales-summary-inline {
+        display: grid;
+        gap: clamp(0.75rem, 3vw, 1.25rem);
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      }
+
+      .sales-summary-inline .metric {
+        display: grid;
+        gap: 0.35rem;
+        padding: clamp(1rem, 3vw, 1.5rem);
+        border-radius: 1rem;
+        background: var(--color-surface-strong);
+        border: 0.08rem solid rgba(228, 68, 122, 0.16);
+        text-align: center;
+        box-shadow: 0 1rem 2.5rem rgba(228, 68, 122, 0.1);
+      }
+
+      .table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        border-radius: 1.25rem;
+        border: 0.08rem solid rgba(228, 68, 122, 0.18);
+        background: var(--color-surface-strong);
+      }
+
+      .table-wrapper::-webkit-scrollbar {
+        height: 0.5rem;
+      }
+
+      .table-wrapper::-webkit-scrollbar-thumb {
+        background: rgba(228, 68, 122, 0.4);
+        border-radius: 999px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 30rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: clamp(0.75rem, 2.5vw, 1rem);
+        font-size: clamp(1rem, 2vw, 1.1rem);
+      }
+
+      thead {
+        background: rgba(228, 68, 122, 0.12);
+      }
+
+      tbody tr:nth-child(odd) {
+        background: rgba(251, 211, 219, 0.45);
+      }
+
+      tbody tr:hover {
+        background: rgba(240, 121, 153, 0.15);
+      }
+
+      @media (min-width: 480px) {
+        body[data-page='influencer'] {
+          padding-inline: clamp(1.5rem, 6vw, 4.5rem);
+        }
+
+        .info-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .card-actions {
+          grid-auto-flow: column;
+          justify-content: start;
+          align-items: center;
+        }
+      }
+
+      @media (min-width: 768px) {
+        .card-headline {
+          text-align: left;
+        }
+
+        .dashboard-grid.influencer-layout {
+          grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+      }
+
+      @media (min-width: 1024px) {
+        body[data-page='influencer'] {
+          padding: clamp(2.5rem, 5vw, 4rem) clamp(3rem, 7vw, 5rem);
+        }
+
+        .dashboard-grid.influencer-layout {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+          align-items: start;
+        }
+
+        .card-actions {
+          justify-content: space-between;
+        }
+      }
+
+      @media (min-width: 1440px) {
+        body[data-page='influencer'] {
+          padding: clamp(3rem, 6vw, 5rem) clamp(4rem, 7vw, 6rem);
+        }
+
+        .dashboard-grid.influencer-layout {
+          gap: clamp(2rem, 3vw, 3rem);
+        }
+      }
+    </style>
+    <script defer src="main.js"></script>
+  </head>
+  <body data-page="influencer">
+    <div class="container" id="influencerPage">
+      <header class="page-hero influencer-hero">
+        <div class="hero-content">
+          <p class="hero-eyebrow">Painel da Influenciadora</p>
+          <h1>Bem vinda, Pinklover.</h1>
+        </div>
+      </header>
+
+      <main class="dashboard-grid influencer-layout">
+        <section class="card influencer-details-card" aria-labelledby="influencer-info-title">
+          <div class="card-headline">
+            <h2 id="influencer-info-title">Seus dados</h2>
+          </div>
+          <div id="influencerDetails" class="info-grid" aria-live="polite"></div>
+          <div class="card-actions influencer-contract-actions">
+            <button type="button" id="viewSignedContractButton" disabled>Visualizar contrato assinado</button>
+            <div id="influencerContractMessage" class="message" aria-live="polite" hidden></div>
+            <button type="button" class="button-logout" data-action="logout">Sair</button>
+          </div>
+        </section>
+
+
+
+        <section class="card influencer-history-card" aria-labelledby="influencer-sales-title">
+          <div class="card-headline">
+            <h2 id="influencer-sales-title">Acompanhe seu desempenho.</h2>
+            <p>Visualize os resultados das suas campanhas, pedidos e comissões em cada ciclo.</p>
+          </div>
+          <div id="influencerSalesMessage" class="message" aria-live="polite"></div>
+          <div id="influencerSalesSummary" class="sales-summary-inline" aria-live="polite"></div>
+          <div class="table-wrapper">
+            <table id="influencerSalesTable">
+              <thead>
+                <tr>
+                  <th>Número do pedido</th>
+                  <th>Data</th>
+                  <th>Valor líquido</th>
+                  <th>Comissão</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

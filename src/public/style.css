@@ -955,18 +955,6 @@ body[data-page='influencer'] table tbody tr:hover {
   gap: 12px;
 }
 
-.influencer-card .actions button[data-action='whatsapp'] {
-  background: linear-gradient(135deg, #25d366, #128c7e);
-  color: #ffffff;
-  border: none;
-}
-
-.influencer-card .actions button[data-action='whatsapp']:hover,
-.influencer-card .actions button[data-action='whatsapp']:focus {
-  background: linear-gradient(135deg, #2fe076, #18a98f);
-  color: #ffffff;
-}
-
 .empty {
   color: var(--text-muted);
   font-style: italic;
